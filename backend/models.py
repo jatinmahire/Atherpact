@@ -204,3 +204,39 @@ class AuditTriageResponse(BaseModel):
     region_index: int
     label: str
     tile_path: str
+
+
+# ── Reviews ─────────────────────────────────────────────────────────────────────
+
+class ReviewCreate(BaseModel):
+    booking_id: str
+    score: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
+
+
+class ReviewOut(BaseModel):
+    id: str
+    booking_id: str
+    rater_id: str
+    score: int
+    comment: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProviderReviewsOut(BaseModel):
+    provider_id: str
+    average_rating: Optional[float]
+    total_reviews: int
+    reviews: List[ReviewOut]
+
+
+# ── Provider Analytics ──────────────────────────────────────────────────────────
+
+class ProviderAnalyticsOut(BaseModel):
+    active_listings: int
+    completed_bookings: int
+    average_rating: Optional[float]
+    total_reviews: int

@@ -7,8 +7,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle, AlertTriangle, Loader2, Eye, ArrowLeft, Video, X, ThumbsDown, ThumbsUp } from 'lucide-react'
-import { bookingsAPI, auditAPI } from '../api/client'
+import { Camera, Upload, CheckCircle, AlertTriangle, Loader2, Eye, ArrowLeft, Video, X, ThumbsDown, ThumbsUp, Star } from 'lucide-react'
+import { bookingsAPI, auditAPI, reviewsAPI } from '../api/client'
 import type { BookingItem, AuditSummary, TriageLabel } from '../api/client'
 import { authStore } from '../store/auth'
 
@@ -17,6 +17,63 @@ interface ChangeBox {
   y: number
   w: number
   h: number
+}
+
+/** Closes the LIST -> ... -> VERIFY -> REVIEW loop with a real POST /reviews
+ * call — no fabricated "thanks for your review" without it actually saving. */
+function ReviewForm({ bookingId }: { bookingId: string }) {
+  const [score, setScore] = useState(0)
+  const [hoverScore, setHoverScore] = useState(0)
+  const [comment, setComment] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async () => {
+    if (score < 1) return
+    setSubmitting(true)
+    setError('')
+    try {
+      await reviewsAPI.create(bookingId, score, comment || undefined)
+      setSubmitted(true)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail ?? 'Could not submit review')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="mt-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-green-700">
+        <CheckCircle size={16} /> Thanks — your review was saved.
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-100">
+      <p className="text-sm font-medium text-gray-700 mb-2">Rate this booking</p>
+      <div className="flex gap-1 mb-3">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button"
+            onMouseEnter={() => setHoverScore(n)} onMouseLeave={() => setHoverScore(0)}
+            onClick={() => setScore(n)}
+            className="p-0.5">
+            <Star size={22} className={(hoverScore || score) >= n ? 'fill-amber-400 text-amber-400' : 'text-gray-300'} />
+          </button>
+        ))}
+      </div>
+      <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2}
+        placeholder="Optional comment…"
+        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-navy resize-none mb-2" />
+      {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+      <button onClick={submit} disabled={score < 1 || submitting}
+        className="bg-navy text-white px-4 py-2 rounded-xl font-semibold text-sm disabled:opacity-40 flex items-center gap-2 hover:bg-navy-light transition-colors">
+        {submitting && <Loader2 size={14} className="animate-spin" />} Submit Review
+      </button>
+    </div>
+  )
 }
 
 export default function AuditPage() {
@@ -411,6 +468,8 @@ export default function AuditPage() {
                       </span>
                     </div>
                   )}
+
+                  {selected && <ReviewForm bookingId={selected.id} />}
                 </motion.div>
               )}
             </AnimatePresence>

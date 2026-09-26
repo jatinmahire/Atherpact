@@ -5,9 +5,9 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown } from 'lucide-react'
-import { listingsAPI } from '../api/client'
-import type { Listing, RecurringAvailabilityRule } from '../api/client'
+import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown, Star, CalendarCheck } from 'lucide-react'
+import { listingsAPI, analyticsAPI } from '../api/client'
+import type { Listing, RecurringAvailabilityRule, ProviderAnalytics } from '../api/client'
 import { authStore } from '../store/auth'
 import { useNavigate } from 'react-router-dom'
 
@@ -132,6 +132,7 @@ export default function ProviderPortal() {
 
   const [listings, setListings]         = useState<Listing[]>([])
   const [loadingList, setLoadingList]   = useState(true)
+  const [analytics, setAnalytics]       = useState<ProviderAnalytics | null>(null)
   const [showForm, setShowForm]         = useState(false)
   const [safetyNote, setSafetyNote]     = useState<SafetyNote | null>(null)
   const [submitting, setSubmitting]     = useState(false)
@@ -158,6 +159,14 @@ export default function ProviderPortal() {
       const mine = res.data.filter((l) => l.owner_id === user.id)
       setListings(mine)
     }).finally(() => setLoadingList(false))
+  }, [success, user?.id])
+
+  // Real dashboard analytics (completed bookings, average rating) — closes
+  // the LIST -> ... -> REVIEW -> DASHBOARD ANALYTICS loop with actual backend
+  // aggregates, never fabricated placeholder numbers.
+  useEffect(() => {
+    if (!user?.id) return
+    analyticsAPI.getProviderAnalytics().then((res) => setAnalytics(res.data)).catch(() => {})
   }, [success, user?.id])
 
   // Laya description safety check (debounced)
@@ -222,11 +231,17 @@ export default function ProviderPortal() {
       </nav>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* Revenue summary */}
+        {/* Revenue summary + real dashboard analytics (completed bookings, avg rating) */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
           {[
             { label: 'Active Listings', value: listings.length, icon: <CheckCircle size={18} className="text-green-500" /> },
             { label: 'Combined Daily Rate', value: `₹${totalRevenue.toLocaleString('en-IN')}`, icon: <TrendingUp size={18} className="text-navy" /> },
+            { label: 'Completed Bookings', value: analytics?.completed_bookings ?? '—', icon: <CalendarCheck size={18} className="text-navy" /> },
+            {
+              label: analytics?.total_reviews ? `Avg Rating (${analytics.total_reviews})` : 'Avg Rating',
+              value: analytics?.average_rating != null ? analytics.average_rating.toFixed(1) : 'No reviews yet',
+              icon: <Star size={18} className="text-amber-400" />,
+            },
           ].map((s, i) => (
             <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.1 }}
               className="bg-white rounded-2xl p-5 border border-lavender/20 shadow-sm flex items-center gap-3">

@@ -240,3 +240,42 @@ export const auditAPI = {
   triage: (auditLogId: string, regionIndex: number, label: TriageLabel) =>
     api.post(`/audit/${auditLogId}/triage`, { region_index: regionIndex, label }),
 }
+
+// ─── Reviews ─────────────────────────────────────────────────────────────────
+
+export interface Review {
+  id: string
+  booking_id: string
+  rater_id: string
+  score: number
+  comment: string | null
+  created_at: string
+}
+
+export interface ProviderReviews {
+  provider_id: string
+  average_rating: number | null
+  total_reviews: number
+  reviews: Review[]
+}
+
+export const reviewsAPI = {
+  create: (bookingId: string, score: number, comment?: string) =>
+    api.post<Review>('/reviews', { booking_id: bookingId, score, comment: comment || undefined }),
+
+  getForProvider: (providerId: string) =>
+    api.get<ProviderReviews>(`/reviews/${providerId}`),
+}
+
+// ─── Provider Analytics ────────────────────────────────────────────────────────
+
+export interface ProviderAnalytics {
+  active_listings: number
+  completed_bookings: number
+  average_rating: number | null
+  total_reviews: number
+}
+
+export const analyticsAPI = {
+  getProviderAnalytics: () => api.get<ProviderAnalytics>('/provider/analytics'),
+}
