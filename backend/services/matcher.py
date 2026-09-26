@@ -1,10 +1,11 @@
 """
 AetherPact — Phase 3: Real Semantic Matching Service.
+Phase 10 (Addendum 2): price-fit, semantic clamping, and exponential distance decay fixes.
 
 Scoring formula (exact — never deviate):
-  semantic_score  = cosine_similarity(query_embedding, listing_embedding)
-  price_score     = max(0, 1 - abs(listing.price - budget) / budget)  if budget > 0  else 0.5
-  distance_score  = haversine decay to 0 over 10 km
+  semantic_score  = max(0, cosine_similarity(query_embedding, listing_embedding))
+  price_score     = 1.0 if listing.price <= budget, else max(0, 1 - (price-budget)/budget); 0.5 if budget<=0
+  distance_score  = exp(-km / 10.0)  (never hard-zeroed past 10 km)
   final_score     = 0.5*semantic_score + 0.3*price_score + 0.2*distance_score
 
 All scores returned rounded to 3 decimal places.
@@ -56,9 +57,18 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def _price_score(listing_price: float, budget: float) -> float:
+    """
+    Phase 10 fix: a listing priced under budget is a perfect fit (1.0), not
+    penalized the same as one priced over budget by the same absolute gap.
+    """
     if budget <= 0:
         return 0.5
-    return max(0.0, 1.0 - abs(listing_price - budget) / budget)
+    if listing_price <= budget:
+        return 1.0
+    return max(0.0, 1.0 - ((listing_price - budget) / budget))
+
+
+_DISTANCE_DECAY_KM = 10.0
 
 
 def _distance_score(
@@ -67,11 +77,16 @@ def _distance_score(
     asset_lat: float,
     asset_lon: float,
 ) -> float:
-    """Linear decay from 1.0 at 0 km to 0.0 at ≥10 km. Returns 0.5 if coords absent."""
+    """
+    Phase 10 fix: exponential decay instead of a hard linear cutoff — a listing
+    12-15 km out (common for peri-urban kitchens/AV depots) now gets a small
+    nonzero score instead of being zeroed out entirely past 10 km.
+    Returns 0.5 if coords absent.
+    """
     if req_lat is None or req_lon is None:
         return 0.5
     km = _haversine_km(req_lat, req_lon, asset_lat, asset_lon)
-    return max(0.0, 1.0 - km / 10.0)
+    return math.exp(-km / _DISTANCE_DECAY_KM)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,7 +111,7 @@ def score_listing(
     model = get_model()
     listing_emb = model.encode(listing_description, convert_to_numpy=True)
 
-    sem   = round(_cosine(query_embedding, listing_emb), 3)
+    sem   = round(max(0.0, _cosine(query_embedding, listing_emb)), 3)
     price = round(_price_score(listing_price, budget), 3)
     dist  = round(_distance_score(req_lat, req_lon, listing_lat, listing_lon), 3)
     final = round(0.5 * sem + 0.3 * price + 0.2 * dist, 3)
