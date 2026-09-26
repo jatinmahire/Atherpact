@@ -5,14 +5,14 @@ GET /bookings — list the current user's bookings.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from database import get_db, Booking, Asset, User
+from database import get_db, Booking, Asset, User, MatchingFeedback, PricingHistory, Negotiation, Referral
 from routers.auth import get_current_user
 from routers.listings import check_no_booking_conflict
 
@@ -58,6 +58,13 @@ def create_booking(
     # Hard conflict check — no overlapping confirmed bookings
     check_no_booking_conflict(db, req.asset_id, req.starts_at, req.ends_at)
 
+    # Phase 17 (Addendum 2): must be checked BEFORE this booking is created/
+    # flushed below, otherwise the new row would find itself and this would
+    # always be True.
+    is_first_booking = (
+        db.query(Booking).filter(Booking.seeker_id == current_user.id).first() is None
+    )
+
     booking = Booking(
         id=str(uuid.uuid4()),
         asset_id=req.asset_id,
@@ -68,6 +75,53 @@ def create_booking(
         status="confirmed",
     )
     db.add(booking)
+    db.flush()  # booking.id needed for pricing_history FK before commit
+
+    # Phase 16 (Addendum 2): flip the most recent unbooked MatchingFeedback
+    # row for this listing to was_booked=True — a real, if imperfect, signal
+    # (most-recent-unflipped heuristic, not exact requirement->booking
+    # ground truth) rather than no signal at all.
+    feedback = (
+        db.query(MatchingFeedback)
+        .filter(MatchingFeedback.listing_id == req.asset_id, MatchingFeedback.was_booked == False)
+        .order_by(MatchingFeedback.created_at.desc())
+        .first()
+    )
+    if feedback:
+        feedback.was_booked = True
+
+    # Phase 16 (Addendum 2): real settled-price history for a later yield-
+    # pricing training pass. The live pricing heuristic is untouched by this.
+    settled_price = asset.price_per_day
+    if req.negotiation_id:
+        neg = db.get(Negotiation, req.negotiation_id)
+        if neg and neg.clearing_price:
+            settled_price = neg.clearing_price
+    lead_time_days = max(0, (req.starts_at.replace(tzinfo=None) - datetime.utcnow()).days)
+    db.add(PricingHistory(
+        id=str(uuid.uuid4()),
+        booking_id=booking.id,
+        day_of_week=req.starts_at.weekday(),
+        lead_time_days=lead_time_days,
+        listing_type=asset.category,
+        settled_price=settled_price,
+    ))
+
+    # Phase 17 (Addendum 2): referral credit on the referred user's FIRST
+    # confirmed booking only — a stored ledger number, never real payment.
+    if current_user.referred_by:
+        if is_first_booking:
+            referral = (
+                db.query(Referral)
+                .filter(Referral.referred_id == current_user.id, Referral.credited == False)
+                .first()
+            )
+            if referral:
+                referrer = db.get(User, referral.referrer_id)
+                if referrer:
+                    referrer.referral_credit = (referrer.referral_credit or 0.0) + 500.0
+                    referral.credited = True
+
     db.commit()
     db.refresh(booking)
 

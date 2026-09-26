@@ -15,6 +15,7 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=6)
     display_name: str
     role: str = "both"          # "provider" | "seeker" | "both"
+    referral_code: Optional[str] = None  # another user's referral code, if any
 
 
 class LoginRequest(BaseModel):
@@ -33,6 +34,9 @@ class UserOut(BaseModel):
     display_name: str
     role: str
     created_at: datetime
+    verified_at: Optional[datetime] = None
+    referral_code: Optional[str] = None
+    referral_credit: float = 0.0
 
     class Config:
         from_attributes = True
@@ -64,6 +68,7 @@ class ListingOut(BaseModel):
     capacity: Optional[int]
     is_active: bool
     created_at: datetime
+    owner_verified: bool = False  # Phase 15 (Addendum 2): true only if owner has a real verified_at
 
     class Config:
         from_attributes = True
@@ -256,3 +261,60 @@ class ContactMessageCreate(BaseModel):
 class ContactMessageOut(BaseModel):
     id: str
     created_at: datetime
+
+
+# ── Trust & Compliance Connectors (Phase 15, Addendum 2) ───────────────────────
+
+class VerificationStatusOut(BaseModel):
+    connected: bool          # whether a real KYC provider key is configured
+    verified: bool           # whether THIS user has a real verified_at
+    verified_at: Optional[datetime]
+    message: str
+
+
+class InsuranceQuoteRequest(BaseModel):
+    asset_value: float = Field(gt=0)
+    duration_hours: float = Field(gt=0)
+    resource_type: str
+
+
+class InsuranceQuoteOut(BaseModel):
+    available: bool
+    premium: Optional[float]
+    policy_reference: Optional[str]
+    message: str
+
+
+# ── Provider Integrations (Phase 17, Addendum 2) ───────────────────────────────
+
+class PMSStatusOut(BaseModel):
+    connected: bool
+    message: str
+
+
+class LicenseVerificationRequest(BaseModel):
+    registration_number: str
+
+
+class LicenseVerificationOut(BaseModel):
+    connected: bool
+    valid: Optional[bool]
+    message: str
+
+
+# ── Referrals (Phase 17, Addendum 2) ────────────────────────────────────────────
+
+class ReferralStatusOut(BaseModel):
+    referral_code: str
+    referral_credit: float
+    total_referred: int
+    credited_referrals: int
+
+
+# ── Bundling (Phase 17, Addendum 2) ─────────────────────────────────────────────
+
+class BundlingSuggestionOut(BaseModel):
+    asset_id: str
+    title: str
+    category: str
+    co_occurrence_count: int

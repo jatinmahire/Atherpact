@@ -27,6 +27,9 @@ export interface User {
   display_name: string
   role: string
   created_at: string
+  verified_at: string | null
+  referral_code: string | null
+  referral_credit: number
 }
 
 export interface Listing {
@@ -42,6 +45,21 @@ export interface Listing {
   capacity: number | null
   is_active: boolean
   created_at: string
+  owner_verified: boolean
+}
+
+export interface ReferralStatus {
+  referral_code: string
+  referral_credit: number
+  total_referred: number
+  credited_referrals: number
+}
+
+export interface BundlingSuggestion {
+  asset_id: string
+  title: string
+  category: string
+  co_occurrence_count: number
 }
 
 export interface ScoreBreakdown {
@@ -93,13 +111,15 @@ export interface ChatResponse {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const authAPI = {
-  register: (email: string, password: string, display_name: string, role: string) =>
-    api.post<{ access_token: string }>('/auth/register', { email, password, display_name, role }),
+  register: (email: string, password: string, display_name: string, role: string, referral_code?: string) =>
+    api.post<{ access_token: string }>('/auth/register', { email, password, display_name, role, referral_code }),
 
   login: (email: string, password: string) =>
     api.post<{ access_token: string }>('/auth/login', { email, password }),
 
   me: () => api.get<User>('/auth/me'),
+
+  referralStatus: () => api.get<ReferralStatus>('/auth/referral/status'),
 }
 
 // ─── Listings ─────────────────────────────────────────────────────────────────
@@ -131,6 +151,9 @@ export const listingsAPI = {
 
   createRecurringAvailability: (assetId: string, rule: { day_of_week: number; start_time: string; end_time: string }) =>
     api.post<RecurringAvailabilityRule>(`/listings/${assetId}/recurring-availability`, rule),
+
+  getBundling: (assetId: string) =>
+    api.get<BundlingSuggestion[]>(`/listings/${assetId}/bundling`),
 }
 
 // ─── Match ───────────────────────────────────────────────────────────────────

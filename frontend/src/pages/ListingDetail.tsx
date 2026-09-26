@@ -1,20 +1,20 @@
 /**
  * AetherPact — Listing Details (Phase 22, Addendum 3 / reference image panel 3).
  *
- * Honesty notes: the schema has no image_url field (no real photos to gallery),
- * no "verified provider" flag (Addendum 2's KYC connector was never wired up),
+ * Honesty notes: the schema has no image_url field (no real photos to gallery)
  * and no saved-listings/messaging backend — so this page shows a category icon
- * instead of a fake photo, omits a fabricated verified badge, and omits
- * "Save"/"Contact Provider" buttons rather than ship dead ones. It DOES show
- * the real GET /reviews/{provider_id} and GET /listings/{id}/recurring-
- * availability data, which do exist.
+ * instead of a fake photo, and omits "Save"/"Contact Provider" buttons rather
+ * than ship dead ones. The Verified badge and "you might also need" bundling
+ * section ARE real (Phase 15/17, Addendum 2's trust connectors + booking
+ * co-occurrence), same as the real GET /reviews/{provider_id} and
+ * GET /listings/{id}/recurring-availability data already shown here.
  */
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MapPin, Loader2, Star, Repeat } from 'lucide-react'
+import { MapPin, Loader2, Star, Repeat, BadgeCheck } from 'lucide-react'
 import { listingsAPI, reviewsAPI } from '../api/client'
-import type { Listing, ProviderReviews, RecurringAvailabilityRule, MatchResultItem } from '../api/client'
+import type { Listing, ProviderReviews, RecurringAvailabilityRule, MatchResultItem, BundlingSuggestion } from '../api/client'
 import { authStore } from '../store/auth'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -36,6 +36,7 @@ export default function ListingDetail() {
   const [listing, setListing] = useState<Listing | null>(null)
   const [reviews, setReviews] = useState<ProviderReviews | null>(null)
   const [rules, setRules] = useState<RecurringAvailabilityRule[]>([])
+  const [bundling, setBundling] = useState<BundlingSuggestion[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [negotiating, setNegotiating] = useState<MatchResultItem | null>(null)
@@ -50,6 +51,7 @@ export default function ListingDetail() {
         Promise.all([
           reviewsAPI.getForProvider(res.data.owner_id).then((r) => setReviews(r.data)).catch(() => {}),
           listingsAPI.listRecurringAvailability(res.data.id).then((r) => setRules(r.data)).catch(() => {}),
+          listingsAPI.getBundling(res.data.id).then((r) => setBundling(r.data)).catch(() => {}),
         ])
       })
       .catch(() => setError(true))
@@ -83,7 +85,14 @@ export default function ListingDetail() {
             {CATEGORY_ICON[listing.category] ?? '📦'}
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">{listing.title}</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl font-bold text-gray-900">{listing.title}</h1>
+            {listing.owner_verified && (
+              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+                <BadgeCheck size={13} /> Verified Provider
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 text-sm flex items-center gap-1 mb-4"><MapPin size={13} /> {listing.address}</p>
 
           {reviews && reviews.total_reviews > 0 && (
@@ -119,6 +128,28 @@ export default function ListingDetail() {
                 <div><div className="font-bold text-gray-900">{(matchScores.semantic_score * 100).toFixed(0)}%</div>Semantic</div>
                 <div><div className="font-bold text-gray-900">{(matchScores.price_score * 100).toFixed(0)}%</div>Price Fit</div>
                 <div><div className="font-bold text-gray-900">{(matchScores.distance_score * 100).toFixed(0)}%</div>Distance</div>
+              </div>
+            </div>
+          )}
+
+          {bundling.length > 0 && (
+            <div className="mb-6">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                You might also need
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {bundling.map((b) => (
+                  <button
+                    key={b.asset_id}
+                    onClick={() => nav(`/listing/${b.asset_id}`)}
+                    className="text-left bg-white rounded-xl border border-lavender/20 px-3 py-2 hover:shadow-sm transition-shadow"
+                  >
+                    <span className="text-sm font-medium text-gray-900">{CATEGORY_ICON[b.category] ?? '📦'} {b.title}</span>
+                    <span className="block text-xs text-gray-400 mt-0.5">
+                      Booked together {b.co_occurrence_count} time{b.co_occurrence_count !== 1 ? 's' : ''}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}

@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, MapPin, Cpu } from 'lucide-react'
+import { ChevronDown, MapPin, Cpu, BadgeCheck } from 'lucide-react'
 import type { MatchResultItem } from '../api/client'
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -70,6 +70,11 @@ export default function MatchCard({ item, rank, onNegotiate }: Props) {
               <span className="text-xs px-2 py-0.5 rounded-full bg-lavender/30 text-navy font-medium">
                 {CATEGORY_LABELS[asset.category] ?? asset.category}
               </span>
+              {asset.owner_verified && (
+                <span className="flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+                  <BadgeCheck size={12} /> Verified
+                </span>
+              )}
             </div>
             <h3 className="font-semibold text-gray-900 text-lg leading-tight cursor-pointer hover:text-navy transition-colors"
               onClick={() => nav(`/listing/${asset.id}`, { state: { matchItem: item } })}>

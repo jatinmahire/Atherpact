@@ -44,6 +44,14 @@ class User(Base):
     hashed_pw     = Column(String, nullable=False)
     display_name  = Column(String, nullable=False)
     role          = Column(String, nullable=False)          # "provider" | "seeker" | "both"
+    # Phase 15 (Addendum 2): set only by a real verification_connector call once
+    # a real KYC provider key exists. Null means "not verified" — never faked.
+    verified_at   = Column(DateTime, nullable=True)
+    # Phase 17 (Addendum 2): referral loop. code is this user's own shareable
+    # code; referred_by is the code they signed up with, if any.
+    referral_code   = Column(String, unique=True, nullable=True)
+    referred_by     = Column(String, nullable=True)
+    referral_credit = Column(Float, default=0.0)  # a stored ledger number only — no real payment behind it
     created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -206,6 +214,47 @@ class ContactMessage(Base):
     category    = Column(String, nullable=False)  # general|booking|negotiation|verification|technical
     message     = Column(Text, nullable=False)
     created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class MatchingFeedback(Base):
+    """Phase 16 (Addendum 2): real (requirement_text, listing_id, was_booked)
+    outcomes, logged as real usage accrues. Feeds a later contrastive
+    fine-tuning pass (train_finetuned_embeddings.py) — /match keeps using the
+    base all-MiniLM-L6-v2 model until a fine-tuned checkpoint is explicitly
+    swapped in. was_booked starts False and is flipped True if a booking is
+    later made for that listing following this match."""
+    __tablename__ = "matching_feedback"
+    id                = Column(String, primary_key=True)
+    requirement_text  = Column(Text, nullable=False)
+    listing_id        = Column(String, ForeignKey("assets.id"), nullable=False)
+    was_booked        = Column(Boolean, default=False)
+    created_at        = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class PricingHistory(Base):
+    """Phase 16 (Addendum 2): real settled-price history for a later
+    train_yield_model.py (LightGBM) pass. The live pricing endpoint keeps
+    using the existing rule-based heuristic regardless."""
+    __tablename__ = "pricing_history"
+    id              = Column(String, primary_key=True)
+    booking_id      = Column(String, ForeignKey("bookings.id"), nullable=False)
+    day_of_week     = Column(Integer, nullable=False)   # 0=Monday
+    lead_time_days  = Column(Integer, nullable=False)   # days between booking creation and start
+    listing_type    = Column(String, nullable=False)    # asset.category
+    settled_price   = Column(Float, nullable=False)
+    created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Referral(Base):
+    """Phase 17 (Addendum 2): who referred whom, and whether the stored
+    (non-monetary) credit has been awarded yet — awarded on the referred
+    user's first completed booking, never before."""
+    __tablename__ = "referrals"
+    id             = Column(String, primary_key=True)
+    referrer_id    = Column(String, ForeignKey("users.id"), nullable=False)
+    referred_id    = Column(String, ForeignKey("users.id"), nullable=False)
+    credited       = Column(Boolean, default=False)
+    created_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

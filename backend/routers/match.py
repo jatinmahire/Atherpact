@@ -10,9 +10,10 @@ from typing import List
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from database import get_db, Asset, Requirement, MatchResult
+from database import get_db, Asset, Requirement, MatchResult, MatchingFeedback
 from models import MatchRequest, MatchResponse, MatchResultOut, ScoreBreakdown
 from services.matcher import rank_listings
+from routers.listings import attach_owner_verified
 
 router = APIRouter(tags=["match"])
 
@@ -48,6 +49,8 @@ def match(req: MatchRequest, db: Session = Depends(get_db)):
         req_lon=req.lon,
     )
 
+    attach_owner_verified(db, [item["asset"] for item in ranked])
+
     # Persist match results
     results_out = []
     for item in ranked:
@@ -64,6 +67,17 @@ def match(req: MatchRequest, db: Session = Depends(get_db)):
             final_score=scores["final_score"],
         )
         db.add(mr)
+
+        # Phase 16 (Addendum 2): real (requirement_text, listing_id, was_booked)
+        # logging as usage accrues — feeds a later fine-tuning pass; was_booked
+        # starts False and is flipped True in bookings.py if this listing is
+        # subsequently booked. /match itself keeps using the base model.
+        db.add(MatchingFeedback(
+            id=str(uuid.uuid4()),
+            requirement_text=req.description,
+            listing_id=asset.id,
+            was_booked=False,
+        ))
 
         results_out.append(
             MatchResultOut(

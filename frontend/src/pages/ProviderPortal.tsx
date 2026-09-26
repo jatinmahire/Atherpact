@@ -5,9 +5,9 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown, Star, CalendarCheck } from 'lucide-react'
-import { listingsAPI, analyticsAPI } from '../api/client'
-import type { Listing, RecurringAvailabilityRule, ProviderAnalytics } from '../api/client'
+import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown, Star, CalendarCheck, Gift, Copy } from 'lucide-react'
+import { listingsAPI, analyticsAPI, authAPI } from '../api/client'
+import type { Listing, RecurringAvailabilityRule, ProviderAnalytics, ReferralStatus } from '../api/client'
 import { authStore } from '../store/auth'
 import { useNavigate } from 'react-router-dom'
 
@@ -133,6 +133,8 @@ export default function ProviderPortal() {
   const [listings, setListings]         = useState<Listing[]>([])
   const [loadingList, setLoadingList]   = useState(true)
   const [analytics, setAnalytics]       = useState<ProviderAnalytics | null>(null)
+  const [referral, setReferral]         = useState<ReferralStatus | null>(null)
+  const [copied, setCopied]             = useState(false)
   const [showForm, setShowForm]         = useState(false)
   const [safetyNote, setSafetyNote]     = useState<SafetyNote | null>(null)
   const [submitting, setSubmitting]     = useState(false)
@@ -168,6 +170,19 @@ export default function ProviderPortal() {
     if (!user?.id) return
     analyticsAPI.getProviderAnalytics().then((res) => setAnalytics(res.data)).catch(() => {})
   }, [success, user?.id])
+
+  // Phase 17 (Addendum 2): real referral code + credit ledger, never fabricated.
+  useEffect(() => {
+    if (!user?.id) return
+    authAPI.referralStatus().then((res) => setReferral(res.data)).catch(() => {})
+  }, [user?.id])
+
+  const copyReferralLink = () => {
+    if (!referral) return
+    navigator.clipboard.writeText(`${window.location.origin}/register?ref=${referral.referral_code}`).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   // Laya description safety check (debounced)
   useEffect(() => {
@@ -260,6 +275,29 @@ export default function ProviderPortal() {
             <Plus size={20} /> Add Listing
           </motion.button>
         </div>
+
+        {/* Referral (Phase 17, Addendum 2): real code + ledger credit */}
+        {referral && (
+          <div className="bg-white rounded-2xl p-5 border border-lavender/20 shadow-sm flex items-center justify-between gap-4 mb-8 flex-wrap">
+            <div className="flex items-center gap-3">
+              <Gift size={20} className="text-navy shrink-0" />
+              <div>
+                <div className="text-sm font-semibold text-gray-900">
+                  Your referral code: <span className="font-mono">{referral.referral_code}</span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {referral.total_referred} referred · {referral.credited_referrals} credited · ₹{referral.referral_credit.toLocaleString('en-IN')} earned
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={copyReferralLink}
+              className="flex items-center gap-1.5 text-xs font-medium text-navy border border-navy/20 rounded-full px-3 py-1.5 hover:bg-navy/5 transition-colors"
+            >
+              <Copy size={13} /> {copied ? 'Copied!' : 'Copy invite link'}
+            </button>
+          </div>
+        )}
 
         {/* Success toast */}
         <AnimatePresence>

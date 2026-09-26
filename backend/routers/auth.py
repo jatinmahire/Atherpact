@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from database import get_db, User
-from models import RegisterRequest, LoginRequest, TokenResponse, UserOut
+from database import get_db, User, Referral
+from models import RegisterRequest, LoginRequest, TokenResponse, UserOut, ReferralStatusOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -36,6 +36,14 @@ def _verify(pw: str, hashed: str) -> bool:
 def _make_token(user_id: str) -> str:
     exp = datetime.now(timezone.utc) + TOKEN_TTL
     return jwt.encode({"sub": user_id, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _generate_referral_code(db: Session) -> str:
+    """8-char uppercase code, retried on the rare collision."""
+    while True:
+        code = uuid.uuid4().hex[:8].upper()
+        if not db.query(User).filter(User.referral_code == code).first():
+            return code
 
 
 def get_current_user(
@@ -66,14 +74,30 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already registered")
     if req.role not in ("provider", "seeker", "both"):
         raise HTTPException(status_code=422, detail="role must be provider, seeker, or both")
+    referrer = None
+    if req.referral_code:
+        referrer = db.query(User).filter(User.referral_code == req.referral_code.strip().upper()).first()
+
     user = User(
         id=str(uuid.uuid4()),
         email=req.email,
         hashed_pw=_hash(req.password),
         display_name=req.display_name,
         role=req.role,
+        referral_code=_generate_referral_code(db),
+        referred_by=referrer.id if referrer else None,
     )
     db.add(user)
+    db.flush()  # user.id needed for the Referral FK before commit
+
+    if referrer:
+        db.add(Referral(
+            id=str(uuid.uuid4()),
+            referrer_id=referrer.id,
+            referred_id=user.id,
+            credited=False,
+        ))
+
     db.commit()
     return TokenResponse(access_token=_make_token(user.id))
 
@@ -89,3 +113,22 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(current: User = Depends(get_current_user)):
     return current
+
+
+@router.get("/referral/status", response_model=ReferralStatusOut)
+def referral_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.referral_code:
+        # Self-heal for users created before referral codes existed (seed data).
+        current_user.referral_code = _generate_referral_code(db)
+        db.commit()
+
+    referrals = db.query(Referral).filter(Referral.referrer_id == current_user.id).all()
+    return ReferralStatusOut(
+        referral_code=current_user.referral_code,
+        referral_credit=current_user.referral_credit or 0.0,
+        total_referred=len(referrals),
+        credited_referrals=sum(1 for r in referrals if r.credited),
+    )

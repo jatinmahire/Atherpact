@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
 import { authAPI } from '../api/client'
@@ -11,8 +11,10 @@ import { authStore } from '../store/auth'
 
 export default function Register() {
   const nav = useNavigate()
+  const [searchParams] = useSearchParams()
   const [form, setForm] = useState({
-    email: '', password: '', display_name: '', role: 'both'
+    email: '', password: '', display_name: '', role: 'both',
+    referral_code: searchParams.get('ref') ?? '',
   })
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
@@ -25,7 +27,10 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      const res = await authAPI.register(form.email, form.password, form.display_name, form.role)
+      const res = await authAPI.register(
+        form.email, form.password, form.display_name, form.role,
+        form.referral_code.trim() || undefined,
+      )
       authStore.setToken(res.data.access_token)
       await authStore.restoreSession()
       nav('/')
@@ -103,6 +108,16 @@ export default function Register() {
               <option value="provider">Provider (list my resources)</option>
               <option value="seeker">Seeker (find resources to rent)</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Referral Code <span className="text-gray-400 font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={form.referral_code}
+              onChange={update('referral_code')}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy uppercase"
+              placeholder="e.g. 46D7B980"
+            />
           </div>
           <button
             type="submit"
