@@ -21,7 +21,6 @@ import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 // Fraunces/Archivo are now loaded globally from main.tsx (Addendum 7).
 import ChatWidget from '../components/ChatWidget'
-import SystemStatus from '../components/SystemStatus'
 import { authStore } from '../store/auth'
 import { matchAPI } from '../api/client'
 import type { MatchResultItem } from '../api/client'
@@ -132,9 +131,6 @@ export default function Landing() {
             <span className="text-espresso text-sm font-bold font-display">Æ</span>
           </div>
           <span className="font-display font-semibold text-warm-white text-xl">AetherPact</span>
-          <span className="hidden md:block ml-2 pl-2 border-l border-warm-white/20">
-            <SystemStatus />
-          </span>
         </div>
         <div className="flex gap-4 items-center text-sm">
           <button onClick={() => nav('/seeker')} className="text-warm-white/80 hover:text-warm-white transition-colors">Search</button>

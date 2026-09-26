@@ -393,7 +393,7 @@ export default function ProviderPortal() {
       <nav className="flex items-center justify-between px-4 py-4 max-w-6xl mx-auto border-b border-lavender/20 bg-white/80 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
-            <span className="text-white text-sm font-bold">Æ</span>
+            <span className="text-espresso text-sm font-bold">Æ</span>
           </div>
           <span className="font-bold text-navy text-xl">Provider Portal</span>
         </div>

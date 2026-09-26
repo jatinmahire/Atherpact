@@ -8,7 +8,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authStore } from '../store/auth'
-import SystemStatus from './SystemStatus'
 
 const LINKS = [
   { label: 'Home', path: '/' },
@@ -34,11 +33,10 @@ export default function Navbar() {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => nav('/')}>
           <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
-            <span className="text-white text-sm font-bold">Æ</span>
+            <span className="text-espresso text-sm font-bold">Æ</span>
           </div>
           <span className="font-bold text-navy text-xl">AetherPact</span>
         </div>
-        <span className="hidden lg:block pl-2 border-l border-gray-200"><SystemStatus /></span>
       </div>
 
       <div className="hidden md:flex gap-6">

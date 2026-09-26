@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-navy flex items-center justify-center">
-            <span className="text-white text-xs font-bold">Æ</span>
+            <span className="text-espresso text-xs font-bold">Æ</span>
           </div>
           <span>AetherPact — a real, working local demo. No production claims.</span>
         </div>

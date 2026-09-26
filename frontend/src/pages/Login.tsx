@@ -54,7 +54,7 @@ export default function Login() {
       >
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
-            <span className="text-white text-sm font-bold">Æ</span>
+            <span className="text-espresso text-sm font-bold">Æ</span>
           </div>
           <span className="font-bold text-navy text-xl">AetherPact</span>
         </div>

@@ -182,7 +182,7 @@ export default function NegotiatePage({ item, onClose }: Props) {
       >
         <div className="bg-navy text-espresso px-6 py-4">
           <h2 className="font-bold text-lg">Negotiate — {asset.title}</h2>
-          <p className="text-white/70 text-sm mt-0.5">ZOPA solver computes the clearing price from pure arithmetic</p>
+          <p className="text-espresso/70 text-sm mt-0.5">ZOPA solver computes the clearing price from pure arithmetic</p>
         </div>
 
         <div className="p-6">
