@@ -3,16 +3,65 @@
  * Search form → ranked match cards with animated score bars → Negotiate modal.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Loader2 } from 'lucide-react'
-import { matchAPI } from '../api/client'
-import type { MatchResultItem } from '../api/client'
+import { Search, Loader2, MapPin } from 'lucide-react'
+import { matchAPI, listingsAPI } from '../api/client'
+import type { MatchResultItem, Listing } from '../api/client'
 import { authStore } from '../store/auth'
 import MatchCard from '../components/MatchCard'
 import { SkeletonList } from '../components/SkeletonCard'
 import NegotiatePage from './NegotiatePage'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  banquet_hall: '🏛️ Banquet Hall',
+  commercial_kitchen: '🍳 Commercial Kitchen',
+  av_equipment: '🎤 AV Equipment',
+  transportation: '🚐 Transportation',
+  event_space: '🌆 Event Space',
+}
+
+/** Plain listing card for the default "browse all" view — no match score,
+ * since no search query has been run. Never fabricates a score to fill
+ * this in; that's what MatchCard (used once a real search runs) is for. */
+function ListingBrowseCard({ listing, rank, onNegotiate }: { listing: Listing; rank: number; onNegotiate?: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: rank * 0.05, duration: 0.3 }}
+      className="bg-white rounded-2xl shadow-sm border border-lavender/30 p-5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-lavender/30 text-navy font-medium">
+            {CATEGORY_LABELS[listing.category] ?? listing.category}
+          </span>
+          <h3 className="font-semibold text-gray-900 text-lg leading-tight mt-1">{listing.title}</h3>
+          <p className="text-gray-500 text-sm mt-1 flex items-center gap-1">
+            <MapPin size={12} /> {listing.address}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-xl font-bold text-navy">₹{listing.price_per_day.toLocaleString('en-IN')}</div>
+          <div className="text-xs text-gray-400">per day</div>
+        </div>
+      </div>
+      <p className="text-gray-600 text-sm mt-3 leading-relaxed line-clamp-2">{listing.description}</p>
+      {listing.capacity && (
+        <p className="text-xs text-gray-400 mt-2">Capacity: {listing.capacity} guests</p>
+      )}
+      {onNegotiate && (
+        <div className="mt-4 flex justify-end">
+          <button onClick={onNegotiate}
+            className="text-xs bg-navy text-white px-4 py-1.5 rounded-full font-medium hover:bg-navy-light transition-colors">
+            Negotiate
+          </button>
+        </div>
+      )}
+    </motion.div>
+  )
+}
 
 export default function SeekerPortal() {
   const nav  = useNavigate()
@@ -25,6 +74,20 @@ export default function SeekerPortal() {
   const [searched, setSearched] = useState(false)
   const [error, setError]       = useState('')
   const [negotiating, setNegotiating] = useState<MatchResultItem | null>(null)
+
+  // Default "browse all" view — every active listing, newest first, shown
+  // until a real search is run. Without this, a page titled "Browse
+  // Available Resources" showed nothing at all (including newly created
+  // listings) until the user happened to type a matching query.
+  const [allListings, setAllListings] = useState<Listing[]>([])
+  const [loadingAll, setLoadingAll]   = useState(true)
+
+  useEffect(() => {
+    listingsAPI.list()
+      .then((res) => setAllListings(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingAll(false))
+  }, [])
 
   const search = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,7 +165,37 @@ export default function SeekerPortal() {
           </div>
         </form>
 
-        {/* Results */}
+        {/* Browse-all view — shown until a real search is run, so newly
+            uploaded/updated listings are visible immediately, latest first */}
+        {!searched && (
+          loadingAll ? (
+            <SkeletonList count={3} />
+          ) : allListings.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <Search size={40} className="mx-auto mb-3 opacity-40" />
+              <p>No resources listed yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-400">
+                All {allListings.length} listed resources · newest first — search above to rank by fit
+              </p>
+              {allListings.map((listing, i) => (
+                <ListingBrowseCard
+                  key={listing.id}
+                  listing={listing}
+                  rank={i}
+                  onNegotiate={user ? () => setNegotiating({
+                    asset: listing,
+                    scores: { semantic_score: 0, price_score: 0, distance_score: 0, final_score: 0 },
+                  }) : undefined}
+                />
+              ))}
+            </div>
+          )
+        )}
+
+        {/* Search results */}
         {loading && <SkeletonList count={3} />}
 
         {!loading && error && (
