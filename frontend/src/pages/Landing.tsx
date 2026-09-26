@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Zap, Shield, BarChart3 } from 'lucide-react'
 import ChatWidget from '../components/ChatWidget'
+import SystemStatus from '../components/SystemStatus'
 import { authStore } from '../store/auth'
 
 // Lazy-load the 3D scene so the page hydrates instantly
@@ -49,6 +50,9 @@ export default function Landing() {
             <span className="text-white text-sm font-bold">Æ</span>
           </div>
           <span className="font-bold text-navy text-xl">AetherPact</span>
+          <span className="hidden md:block ml-2 pl-2 border-l border-gray-200">
+            <SystemStatus />
+          </span>
         </div>
         <div className="flex gap-3">
           <button

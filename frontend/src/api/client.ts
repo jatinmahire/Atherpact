@@ -279,3 +279,9 @@ export interface ProviderAnalytics {
 export const analyticsAPI = {
   getProviderAnalytics: () => api.get<ProviderAnalytics>('/provider/analytics'),
 }
+
+// ─── System Status (offline-first indicator) ──────────────────────────────────
+
+export const systemAPI = {
+  health: () => api.get<{ status: string; project: string }>('/health'),
+}
