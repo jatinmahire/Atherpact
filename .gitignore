@@ -32,3 +32,6 @@ frontend/dist/
 
 # Claude Code project files (local session config, not part of the app)
 .claude/
+
+# Local scratch test directories
+backend/_setup_test/
