@@ -90,13 +90,18 @@ function FloatingResourceCard({ item }: { item: MatchResultItem | null }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1.1, duration: 0.6, ease: 'easeOut' }}
       onAnimationComplete={() => setCardShown(true)}
-      className="absolute bottom-6 right-4 sm:bottom-10 sm:right-10 w-64 rounded-2xl bg-[#1f1a15]/90 backdrop-blur border border-[#B8925A]/30 p-4 shadow-2xl font-body"
+      className="glass-surface absolute bottom-6 right-4 sm:bottom-10 sm:right-10 w-64 p-4 font-body overflow-hidden"
     >
-      <p className="text-[10px] uppercase tracking-wide text-[#B8925A] font-medium mb-1">Real live match</p>
-      <h4 className="text-warm-white font-semibold text-sm leading-snug mb-1">{item.asset.title}</h4>
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-warm-white/70 text-xs">₹{item.asset.price_per_day.toLocaleString('en-IN')}/day</span>
-        <span className="text-[#B8925A] font-bold text-sm">{countedPct}% Match</span>
+      {/* Scrim: the hero photo behind this card is busy, so text needs its
+          own darkening layer underneath, independent of the glass blur. */}
+      <div className="absolute inset-0 bg-gradient-to-br from-espresso/50 to-espresso/20 pointer-events-none rounded-[24px]" />
+      <div className="relative">
+        <p className="text-[10px] uppercase tracking-wide text-brass font-medium mb-1">Real live match</p>
+        <h4 className="text-warm-white font-semibold text-sm leading-snug mb-1">{item.asset.title}</h4>
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-warm-white/70 text-xs">₹{item.asset.price_per_day.toLocaleString('en-IN')}/day</span>
+          <span className="text-brass font-bold text-sm">{countedPct}% Match</span>
+        </div>
       </div>
     </motion.div>
   )
@@ -107,10 +112,24 @@ export default function Landing() {
   const [user, setUser] = useState(authStore.getUser())
   const [heroItem, setHeroItem] = useState<MatchResultItem | null>(null)
   const hasFetchedHero = useRef(false)
+  const heroRef = useRef<HTMLDivElement>(null)
+  const [scrolledPastHero, setScrolledPastHero] = useState(false)
 
   useEffect(() => {
     setUser(authStore.getUser())
     return authStore.subscribe(() => setUser(authStore.getUser()))
+  }, [])
+
+  // Glass Surface Pass: the navbar's glass variant switches once the user
+  // has scrolled past the hero photograph and onto the warm stone body.
+  useEffect(() => {
+    const handleScroll = () => {
+      const heroHeight = heroRef.current?.offsetHeight ?? 640
+      setScrolledPastHero(window.scrollY > heroHeight - 80)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   // Real live data for the hero's floating card — never invented numbers.
@@ -124,8 +143,40 @@ export default function Landing() {
 
   return (
     <div className="font-body">
+      {/* Glass Surface Pass: floating nav, fixed above everything. Dark-hero
+          glass while over the photo, stone glass once scrolled past it —
+          reads as glass floating over whatever's moving beneath it. */}
+      <nav
+        className={`glass-surface${scrolledPastHero ? ' glass-surface--on-stone' : ''} fixed top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-50 flex items-center justify-between px-4 sm:px-6 py-3 max-w-6xl mx-auto transition-[background] duration-300`}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-brass flex items-center justify-center">
+            <span className="text-espresso text-sm font-bold font-display">Æ</span>
+          </div>
+          <span className="font-display font-semibold text-warm-white text-xl">AetherPact</span>
+          <span className="hidden md:block ml-2 pl-2 border-l border-warm-white/20">
+            <SystemStatus />
+          </span>
+        </div>
+        <div className="flex gap-4 items-center text-sm">
+          <button onClick={() => nav('/seeker')} className="text-warm-white/80 hover:text-warm-white transition-colors">Search</button>
+          <button onClick={() => nav('/audit')} className="text-warm-white/80 hover:text-warm-white transition-colors">Verify</button>
+          {user ? (
+            <>
+              <span className="text-warm-white/60">{user.display_name}</span>
+              <button onClick={() => { authStore.logout(); nav('/') }} className="text-warm-white/80 hover:text-warm-white transition-colors">Sign out</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => nav('/login')} className="text-warm-white/80 hover:text-warm-white transition-colors">Sign in</button>
+              <button onClick={() => nav('/register')} className="bg-brass text-espresso px-4 py-2 rounded-full font-medium hover:opacity-90 transition-opacity">Get Started</button>
+            </>
+          )}
+        </div>
+      </nav>
+
       {/* ── HERO: cinematic, espresso, one orchestrated animation ── */}
-      <section className="relative bg-espresso text-warm-white overflow-hidden min-h-[640px]">
+      <section ref={heroRef} className="relative bg-espresso text-warm-white overflow-hidden min-h-[640px]">
         <img
           src="/landing/hero-restaurant.webp"
           alt=""
@@ -144,34 +195,7 @@ export default function Landing() {
           </Suspense>
         </div>
 
-        <nav className="relative z-10 flex items-center justify-between px-4 sm:px-8 py-5 max-w-6xl mx-auto">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-brass flex items-center justify-center">
-              <span className="text-espresso text-sm font-bold font-display">Æ</span>
-            </div>
-            <span className="font-display font-semibold text-warm-white text-xl">AetherPact</span>
-            <span className="hidden md:block ml-2 pl-2 border-l border-warm-white/20">
-              <SystemStatus />
-            </span>
-          </div>
-          <div className="flex gap-4 items-center text-sm">
-            <button onClick={() => nav('/seeker')} className="text-warm-white/80 hover:text-warm-white transition-colors">Search</button>
-            <button onClick={() => nav('/audit')} className="text-warm-white/80 hover:text-warm-white transition-colors">Verify</button>
-            {user ? (
-              <>
-                <span className="text-warm-white/60">{user.display_name}</span>
-                <button onClick={() => { authStore.logout(); nav('/') }} className="text-warm-white/80 hover:text-warm-white transition-colors">Sign out</button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => nav('/login')} className="text-warm-white/80 hover:text-warm-white transition-colors">Sign in</button>
-                <button onClick={() => nav('/register')} className="bg-brass text-espresso px-4 py-2 rounded-full font-medium hover:opacity-90 transition-opacity">Get Started</button>
-              </>
-            )}
-          </div>
-        </nav>
-
-        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-8 pt-16 pb-40 sm:pb-56">
+        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-8 pt-28 sm:pt-32 pb-40 sm:pb-56">
           <motion.div
             initial="hidden"
             animate="show"

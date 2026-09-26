@@ -42,6 +42,47 @@ html {
   to   { transform: scale(1.06); }
 }
 
+/* Glass Surface Treatment (Addendum 7, Section 0.5) — scoped to Landing.tsx
+   only for now (hero card + landing navbar). Fallback-first: the base rule
+   is a plain solid-ish translucent panel (works everywhere, including
+   browsers without backdrop-filter); the blur is layered on top only
+   inside an @supports block, per the brief's required graceful fallback. */
+.glass-surface {
+  background: rgba(22, 19, 16, 0.55); /* solid-ish fallback, no blur */
+  border: 1px solid rgba(243, 239, 230, 0.22);
+  border-top-color: rgba(243, 239, 230, 0.4);
+  border-radius: 24px;
+  box-shadow:
+    0 8px 32px rgba(22, 19, 16, 0.28),
+    inset 0 1px 0 rgba(243, 239, 230, 0.25);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass-surface {
+    background: rgba(243, 239, 230, 0.14); /* warm white, low opacity, over a dark photo */
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+  }
+}
+
+/* Variant for a glass surface floating over the light stone section
+   instead of the dark hero photo — darker base/border per the spec. */
+.glass-surface--on-stone {
+  background: rgba(22, 19, 16, 0.55);
+  border: 1px solid rgba(22, 19, 16, 0.18);
+  border-top-color: rgba(22, 19, 16, 0.3);
+  border-radius: 24px;
+  box-shadow:
+    0 8px 32px rgba(22, 19, 16, 0.12),
+    inset 0 1px 0 rgba(243, 239, 230, 0.1);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass-surface--on-stone {
+    background: rgba(22, 19, 16, 0.35);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #f1f3f9; }
