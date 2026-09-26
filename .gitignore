@@ -1,0 +1,33 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+
+# Model weights — bundled via GitHub Release instead, see setup script
+backend/models_cache/*.gguf
+backend/models_cache/all-MiniLM-L6-v2/
+backend/models_cache/laya/
+
+# Runtime data (regenerated on startup)
+backend/aetherpact.db
+backend/aetherpact.db-shm
+backend/aetherpact.db-wal
+backend/audit_images/*.jpg
+backend/audit_images/*.jpeg
+backend/audit_images/*.png
+backend/server_out.log
+backend/server_err.log
+backend/server_pid.txt
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code project files (local session config, not part of the app)
+.claude/
