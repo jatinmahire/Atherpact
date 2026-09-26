@@ -6,6 +6,7 @@ backend/**/__pycache__/
 
 # Model weights — bundled via GitHub Release instead, see setup script
 backend/models_cache/*.gguf
+backend/models_cache/*.zip
 backend/models_cache/all-MiniLM-L6-v2/
 backend/models_cache/laya/
 

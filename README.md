@@ -22,6 +22,7 @@ Built for a hackathon demo. Runs entirely on one local machine: no cloud APIs, n
 
 ## Prerequisites
 
+- Git
 - Python 3.10 or 3.12
 - Node.js 18+
 - npm 9+
@@ -30,20 +31,35 @@ Built for a hackathon demo. Runs entirely on one local machine: no cloud APIs, n
 
 ## Setup (from a clean machine)
 
-### 1. Clone / copy the project
+### 1. Clone the project
 
-```
-c:\AtherPact\
-  backend\
-  frontend\
+```powershell
+git clone https://github.com/jatinmahire/Atherpact.git
+cd Atherpact
 ```
 
-### 2. Install backend dependencies
+### 2. Download the AI model files (one command, one time)
+
+All three local models (Qwen2.5-0.5B GGUF, all-MiniLM-L6-v2, Laya) are **not** stored in git —
+they're ~1.3 GB combined, over GitHub's normal file-size limits. Instead they're attached to this
+repo's own [GitHub Release](https://github.com/jatinmahire/Atherpact/releases/tag/models-v1) and
+fetched by a small script — no Hugging Face account or manual download links needed:
+
+```powershell
+cd backend
+python scripts/setup_models.py
+```
+
+This downloads straight into `backend/models_cache/` and is safe to re-run (it skips anything
+already present). It uses only the Python standard library, so it works even before you've
+created a virtual environment or installed any dependencies. Expect this to take a few minutes
+depending on your connection — the files total about 1.3 GB.
+
+### 3. Install backend dependencies
 
 Use a clean Python 3.10/3.12 virtual environment (see Troubleshooting if your system Python is broken).
 
 ```powershell
-cd c:\AtherPact\backend
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 ```
@@ -57,55 +73,33 @@ prebuilt CPU wheel index instead, then retry the rest:
 .venv\Scripts\pip install -r requirements.txt
 ```
 
-### 3. Install frontend dependencies
+### 4. Install frontend dependencies
 
 ```powershell
-cd c:\AtherPact\frontend
+cd ..\frontend
 npm install
 ```
 
 ---
 
-## Model Files (pre-download before the demo)
+## Model Files
 
-### all-MiniLM-L6-v2 (sentence-transformers)
-Downloaded automatically on first startup from HuggingFace (~90 MB).
-**Pre-download:** `python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"` while online. It caches automatically.
+All three models load straight from the local `backend/models_cache/` folder that
+`scripts/setup_models.py` populates — **no Hugging Face Hub calls at runtime at all**, no
+account, no rate limits, no symlink/cache quirks:
 
----
+| Model | Local path | What it's for |
+|---|---|---|
+| `all-MiniLM-L6-v2` | `backend/models_cache/all-MiniLM-L6-v2/` | Semantic matching |
+| Qwen2.5-0.5B-Instruct (GGUF, Q4_K_M) | `backend/models_cache/qwen2.5-0.5b-instruct-q4_k_m.gguf` | LLM phrasing of settled negotiations |
+| Laya (`convaiinnovations/laya`, English) | `backend/models_cache/laya/` | Advisory: chat intent routing, listing flags, dispute-risk badges |
 
-### MANUAL STEP REQUIRED — Qwen2.5-0.5B-Instruct (GGUF, ~400 MB)
+Each service falls back to downloading by name from Hugging Face if its local copy is missing
+(useful if you're developing and want the latest checkpoint), but the intended path for anyone
+who just cloned the repo and ran `setup_models.py` is 100% local.
 
-Download **before the live demo**, not during it:
-
-**URL:**
-```
-https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
-```
-
-**Save to (exact path):**
-```
-c:\AtherPact\backend\models_cache\qwen2.5-0.5b-instruct-q4_k_m.gguf
-```
-
-Then install llama-cpp-python:
-```powershell
-pip install llama-cpp-python
-```
-
-> **If the file is not present:** the LLM phrasing falls back to a deterministic template — the negotiation and all other features still work correctly.
-
----
-
-### MANUAL STEP REQUIRED — Laya (convaiinnovations/laya)
-
-```powershell
-pip install laya
-```
-
-On first startup, Laya downloads its checkpoint from HuggingFace. Confirm the download completed on the actual demo machine before the event.
-
-> **If Laya is unavailable:** all advisory checks return safe neutral defaults — the marketplace, matching, and negotiation all work without interruption.
+> **If the Qwen GGUF is missing:** LLM phrasing falls back to a deterministic template — negotiation still works correctly, just without AI-generated wording.
+> **If Laya is missing/unavailable:** all advisory checks return safe neutral defaults — the marketplace, matching, and negotiation all work without interruption.
 
 ---
 
@@ -113,16 +107,15 @@ On first startup, Laya downloads its checkpoint from HuggingFace. Confirm the do
 
 ### Start backend
 ```powershell
-cd c:\AtherPact\backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+cd backend
+.venv\Scripts\python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-First start takes 30–120 seconds to download/load the sentence-transformer model.
-Subsequent starts are instant (model is cached by HuggingFace).
+First start takes a few seconds to load the local models into memory. No network access needed.
 
 ### Start frontend
 ```powershell
-cd c:\AtherPact\frontend
+cd frontend
 npm run dev
 ```
 
@@ -151,11 +144,11 @@ npm run dev
 
 With wifi disabled:
 - Backend serves all requests from SQLite (no cloud calls)
-- sentence-transformer model runs from local HuggingFace cache
-- Qwen2.5 runs from local GGUF file
-- Laya runs from local checkpoint cache
+- all-MiniLM-L6-v2 loads from `backend/models_cache/all-MiniLM-L6-v2/` (local folder, no Hugging Face Hub call)
+- Qwen2.5 loads from `backend/models_cache/qwen2.5-0.5b-instruct-q4_k_m.gguf` (local file)
+- Laya loads from `backend/models_cache/laya/` (local folder, no Hugging Face Hub call)
 
-Everything except the initial model downloads is fully offline.
+Everything is fully offline once `scripts/setup_models.py` has populated `models_cache/` once.
 
 ---
 
@@ -169,9 +162,10 @@ Everything except the initial model downloads is fully offline.
 | Sentence-transformer slow first start | Normal — downloads ~90 MB model on first run |
 | `ImportError: email-validator is not installed` | `pydantic`'s `EmailStr` needs it; already pinned in `requirements.txt` as `pydantic[email]` |
 | `llama_cpp` fails to build (`CMake Error: CMAKE_C_COMPILER not set`) | No MSVC/CMake on this machine — install the prebuilt wheel instead: `pip install llama-cpp-python==0.3.2 --index-url https://abetlen.github.io/llama-cpp-python/whl/cpu`. LLM phrasing also has a working deterministic fallback if you skip this entirely. |
-| `Failed to load model from file` (Qwen GGUF) | The download was silently truncated (common on flaky connections — `Invoke-WebRequest`/some downloaders don't error on a dropped connection). Compare the file size to the `Content-Length` header from a `curl -I` on the resolve URL, and re-download with `curl -L -C -` (resume) if it doesn't match. Expected size for `q4_k_m` is ~491 MB. |
-| Laya loads but every check returns neutral defaults | `laya.Agent` only exposes `.predict(state, questions)` (no `.choice()`/`.noul()` methods) — `laya_service.py` already calls the real API this way; if you see `'Agent' object has no attribute ...` you're on an older/different `laya` version than 0.3.20 and its schema may have changed. |
-| `[WinError 1314] A required privilege is not held by the client` while Laya downloads its checkpoint | Windows blocks symlink creation without Developer Mode or admin rights, and `huggingface_hub`'s fallback-to-copy path doesn't always catch it. Enable Developer Mode (Settings → Privacy & Security → For developers) or run as Administrator, then delete `%USERPROFILE%\.cache\huggingface\hub\models--convaiinnovations--laya` and restart to re-download cleanly. The app still starts and works with neutral advisory defaults if you skip this. |
+| `Failed to load model from file` (Qwen GGUF) | The download was silently truncated (common on flaky connections). Re-run `python scripts/setup_models.py` after deleting the partial file — it verifies nothing automatically, so also compare the file size to the release asset (should be ~491 MB). |
+| Laya loads but every check returns neutral defaults | `laya.Agent` only exposes `.predict(state, questions)` (no `.choice()`/`.noul()` methods) — `laya_service.py` already calls the real API this way; if you see `'Agent' object has no attribute ...'` you're on a different `laya` version than 0.3.20 and its schema may have changed. |
+| Laya sometimes misroutes a short/typo'd chat message | This is a real, disclosed limitation of the small `laya` checkpoint on free-text intent classification — `classify_chat_intent` in `laya_service.py` grounds the message with domain context and uses a dominance-margin rule (only blocks the search when a non-search class clearly wins) to reduce this, but it isn't perfect on every phrasing. Rephrasing as "I need/want a ___" is the most reliable pattern. |
+| `[WinError 1314] A required privilege is not held by the client` | Only relevant if you deleted `models_cache/laya/` and let it re-download from Hugging Face by name — Windows blocks symlink creation without Developer Mode/admin rights. Re-run `scripts/setup_models.py` instead, which avoids the Hugging Face Hub cache entirely. |
 | `FOREIGN KEY constraint failed` | Delete `aetherpact.db` and restart — fresh seed will run |
 | Frontend shows `Connection refused` | Backend not yet ready — wait for "AetherPact backend ready ✓" in server log |
 
