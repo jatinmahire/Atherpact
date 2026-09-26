@@ -146,6 +146,56 @@ assert seed_me['id'] == 'seed-provider-001'
 assert seed_me['role'] == 'provider'
 print("[Phase 37] Documented demo credentials (seedprovider@aetherpact.demo) still work — PASS")
 
+# ── Phase 38: Razorpay payment integration ──────────────────────────────────
+import hmac, hashlib, datetime, os
+
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+razorpay_secret = None
+with open(env_path) as f:
+    for line in f:
+        if line.startswith('RAZORPAY_KEY_SECRET='):
+            razorpay_secret = line.strip().split('=', 1)[1]
+assert razorpay_secret, "Could not read RAZORPAY_KEY_SECRET from backend/.env"
+
+pay_asset = requests.get(f'{BASE}/listings').json()[0]
+pay_starts = (datetime.datetime.utcnow() + datetime.timedelta(days=50)).isoformat()
+pay_ends = (datetime.datetime.utcnow() + datetime.timedelta(days=51)).isoformat()
+pay_booking = requests.post(f'{BASE}/bookings', json={
+    'asset_id': pay_asset['id'], 'starts_at': pay_starts, 'ends_at': pay_ends,
+}, headers=h).json()
+assert pay_booking['payment_status'] == 'pending'
+print("[Phase 38] Booking starts payment_status=pending — PASS")
+
+order_resp = requests.post(f"{BASE}/bookings/{pay_booking['id']}/create-order", headers=h)
+assert order_resp.status_code == 200, order_resp.text
+order = order_resp.json()
+assert order['order_id'].startswith('order_')
+assert order['key_id'].startswith('rzp_test_')
+assert order['amount'] == round(pay_asset['price_per_day'] * 100)
+print(f"[Phase 38] Real Razorpay Test Mode order created: {order['order_id']} — PASS")
+
+bad_verify = requests.post(f"{BASE}/bookings/{pay_booking['id']}/verify-payment", json={
+    'razorpay_order_id': order['order_id'], 'razorpay_payment_id': 'pay_FAKE0000000000',
+    'razorpay_signature': 'not-a-real-signature',
+}, headers=h)
+assert bad_verify.status_code == 400
+print("[Phase 38] Invalid payment signature rejected (400) — PASS")
+
+real_payment_id = 'pay_ADDENDUM4TEST01'
+message = f"{order['order_id']}|{real_payment_id}"
+valid_signature = hmac.new(razorpay_secret.encode(), message.encode(), hashlib.sha256).hexdigest()
+good_verify = requests.post(f"{BASE}/bookings/{pay_booking['id']}/verify-payment", json={
+    'razorpay_order_id': order['order_id'], 'razorpay_payment_id': real_payment_id,
+    'razorpay_signature': valid_signature,
+}, headers=h)
+assert good_verify.status_code == 200, good_verify.text
+assert good_verify.json()['payment_status'] == 'paid'
+print("[Phase 38] Valid signature verified server-side, booking marked Paid — PASS")
+
+already_paid = requests.post(f"{BASE}/bookings/{pay_booking['id']}/create-order", headers=h)
+assert already_paid.status_code == 409
+print("[Phase 38] Re-ordering an already-paid booking correctly rejected (409) — PASS")
+
 print("\n" + "=" * 60)
-print("ADDENDUM 4 REGRESSION SUITE (PHASES 36-37): ALL CHECKS PASSED")
+print("ADDENDUM 4 REGRESSION SUITE (PHASES 36-38): ALL CHECKS PASSED")
 print("=" * 60)

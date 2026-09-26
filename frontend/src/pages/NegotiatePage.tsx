@@ -6,9 +6,23 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle, AlertTriangle, Info, Sparkles, Repeat } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, AlertTriangle, Info, Sparkles, Repeat, CreditCard } from 'lucide-react'
 import { negotiateAPI, bookingsAPI } from '../api/client'
 import type { MatchResultItem, NegotiateResponse, SmartSuggestion } from '../api/client'
+import { openRazorpayCheckout } from '../lib/razorpay'
+import { authStore } from '../store/auth'
+
+type PaymentState = 'idle' | 'creating_booking' | 'creating_order' | 'awaiting_payment' | 'verifying' | 'paid' | 'failed'
+
+const PAYMENT_STATE_LABEL: Record<PaymentState, string> = {
+  idle: '',
+  creating_booking: 'Reserving your slot…',
+  creating_order: 'Setting up payment…',
+  awaiting_payment: 'Complete payment in the Razorpay window…',
+  verifying: 'Verifying payment…',
+  paid: '',
+  failed: '',
+}
 
 interface Props {
   item: MatchResultItem
@@ -38,10 +52,16 @@ export default function NegotiatePage({ item, onClose }: Props) {
   const [result, setResult]   = useState<NegotiateResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
-  const [booking, setBooking] = useState(false)
-  const [booked, setBooked]   = useState(false)
   const [multiRound, setMultiRound] = useState(false)
   const [smartSuggestion, setSmartSuggestion] = useState<SmartSuggestion | null>(null)
+
+  // Phase 38 (Addendum 4): real Razorpay payment — a booking is only ever
+  // "Paid" after the backend's own server-side signature verification
+  // succeeds, never from the client-side Checkout callback alone.
+  const [paymentState, setPaymentState] = useState<PaymentState>('idle')
+  const [paymentError, setPaymentError] = useState('')
+  const [bookingId, setBookingId] = useState<string | null>(null)
+  const [paidAmount, setPaidAmount] = useState<number | null>(null)
 
   useEffect(() => {
     negotiateAPI.smartSuggestion(asset.id).then((res) => setSmartSuggestion(res.data)).catch(() => {})
@@ -218,39 +238,74 @@ export default function NegotiatePage({ item, onClose }: Props) {
                       )}
                     </div>
 
-                    {/* ── BOOKING ACTION ── */}
-                    {!booked ? (
+                    {/* ── BOOKING + PAYMENT ACTION (Phase 38, Addendum 4) ── */}
+                    {paymentState === 'paid' ? (
+                      <div className="mt-4 bg-green-50 text-green-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
+                        <CheckCircle2 size={16} />
+                        Booking confirmed &amp; paid{paidAmount != null ? ` (₹${paidAmount.toLocaleString('en-IN')})` : ''} — verified by Razorpay. You can now run visual verification.
+                      </div>
+                    ) : (
                       <button
                         onClick={async () => {
-                          setBooking(true)
+                          setPaymentError('')
                           try {
-                            const now = new Date()
-                            const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-                            await bookingsAPI.create({
-                              asset_id: asset.id,
-                              negotiation_id: result.negotiation_id,
-                              starts_at: now.toISOString(),
-                              ends_at: end.toISOString(),
+                            let bId = bookingId
+                            if (!bId) {
+                              setPaymentState('creating_booking')
+                              const now = new Date()
+                              const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+                              const bookingRes = await bookingsAPI.create({
+                                asset_id: asset.id,
+                                negotiation_id: result.negotiation_id,
+                                starts_at: now.toISOString(),
+                                ends_at: end.toISOString(),
+                              })
+                              bId = bookingRes.data.id
+                              setBookingId(bId)
+                            }
+
+                            setPaymentState('creating_order')
+                            const orderRes = await bookingsAPI.createOrder(bId)
+
+                            setPaymentState('awaiting_payment')
+                            const user = authStore.getUser()
+                            const paymentResponse = await openRazorpayCheckout({
+                              keyId: orderRes.data.key_id,
+                              amount: orderRes.data.amount,
+                              currency: orderRes.data.currency,
+                              orderId: orderRes.data.order_id,
+                              name: 'AetherPact',
+                              description: asset.title,
+                              prefillName: user?.display_name,
+                              prefillEmail: user?.email,
                             })
-                            setBooked(true)
+
+                            setPaymentState('verifying')
+                            await bookingsAPI.verifyPayment(bId, paymentResponse)
+                            setPaidAmount(orderRes.data.amount / 100)
+                            setPaymentState('paid')
                           } catch (err: any) {
-                            setError(err?.response?.data?.detail ?? 'Booking failed — you may need to sign in first.')
-                          } finally {
-                            setBooking(false)
+                            setPaymentState('failed')
+                            setPaymentError(err?.response?.data?.detail ?? err?.message ?? 'Payment failed')
                           }
                         }}
-                        disabled={booking}
+                        disabled={paymentState !== 'idle' && paymentState !== 'failed'}
                         className="mt-4 w-full bg-green-600 text-white py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
                       >
-                        {booking && <Loader2 size={14} className="animate-spin" />}
-                        Confirm & Book (7 days)
+                        {paymentState !== 'idle' && paymentState !== 'failed' ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <CreditCard size={14} />
+                        )}
+                        {PAYMENT_STATE_LABEL[paymentState] || (paymentState === 'failed' ? 'Retry Payment' : 'Confirm & Pay (7 days)')}
                       </button>
-                    ) : (
-                      <div className="mt-4 bg-green-50 text-green-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
-                        <CheckCircle2 size={16} /> Booking confirmed! You can now run visual verification.
+                    )}
+                    {paymentState === 'failed' && paymentError && (
+                      <div className="mt-3 text-red-600 text-sm bg-red-50 rounded-xl px-3 py-2 flex items-center gap-2">
+                        <XCircle size={14} className="shrink-0" /> {paymentError}
                       </div>
                     )}
-                    {error && !booked && (
+                    {error && (
                       <div className="mt-3 text-red-600 text-sm bg-red-50 rounded-xl px-3 py-2">{error}</div>
                     )}
                   </>

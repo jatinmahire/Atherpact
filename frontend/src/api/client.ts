@@ -215,8 +215,16 @@ export interface BookingItem {
   starts_at: string
   ends_at: string
   status: string
+  payment_status: string  // "pending" | "paid" | "failed"
   created_at: string
   asset_title: string | null
+}
+
+export interface RazorpayOrder {
+  order_id: string
+  amount: number  // paise
+  currency: string
+  key_id: string
 }
 
 export const bookingsAPI = {
@@ -224,6 +232,13 @@ export const bookingsAPI = {
     api.post<BookingItem>('/bookings', data),
 
   list: () => api.get<BookingItem[]>('/bookings'),
+
+  // Phase 38 (Addendum 4): real Razorpay payment
+  createOrder: (bookingId: string) =>
+    api.post<RazorpayOrder>(`/bookings/${bookingId}/create-order`),
+
+  verifyPayment: (bookingId: string, data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+    api.post<BookingItem>(`/bookings/${bookingId}/verify-payment`, data),
 }
 
 // ─── Audit ────────────────────────────────────────────────────────────────────

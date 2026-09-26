@@ -1,9 +1,15 @@
 """
 AetherPact — Bookings router.
-POST /bookings — create a confirmed booking with hard conflict checking.
+POST /bookings — create a booking (payment_status starts "pending") with
+    hard conflict checking.
 GET /bookings — list the current user's bookings.
+POST /bookings/{id}/create-order — real Razorpay order for the negotiated
+    price (Phase 38, Addendum 4).
+POST /bookings/{id}/verify-payment — real server-side signature
+    verification; only this can ever mark a booking Paid.
 """
 
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -15,6 +21,7 @@ from sqlalchemy.orm import Session
 from database import get_db, Booking, Asset, User, MatchingFeedback, PricingHistory, Negotiation, Referral
 from routers.auth import get_current_user
 from routers.listings import check_no_booking_conflict
+from services import razorpay_service
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -34,11 +41,37 @@ class BookingOut(BaseModel):
     starts_at: datetime
     ends_at: datetime
     status: str
+    payment_status: str
     created_at: datetime
     asset_title: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class CreateOrderResponse(BaseModel):
+    order_id: str
+    amount: int  # paise, as Razorpay Checkout expects
+    currency: str
+    key_id: str  # public key, safe to send to the client
+
+
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+def _settled_price(db: Session, asset: Asset, negotiation_id: Optional[str]) -> float:
+    """The real deal amount for this booking: the negotiated clearing_price
+    if one exists, else the listing's own asking price. Shared by
+    PricingHistory logging and the Razorpay order amount so both always
+    agree on what was actually charged."""
+    if negotiation_id:
+        neg = db.get(Negotiation, negotiation_id)
+        if neg and neg.clearing_price:
+            return neg.clearing_price
+    return asset.price_per_day
 
 
 @router.post("", response_model=BookingOut)
@@ -73,6 +106,7 @@ def create_booking(
         starts_at=req.starts_at,
         ends_at=req.ends_at,
         status="confirmed",
+        payment_status="pending",
     )
     db.add(booking)
     db.flush()  # booking.id needed for pricing_history FK before commit
@@ -92,11 +126,7 @@ def create_booking(
 
     # Phase 16 (Addendum 2): real settled-price history for a later yield-
     # pricing training pass. The live pricing heuristic is untouched by this.
-    settled_price = asset.price_per_day
-    if req.negotiation_id:
-        neg = db.get(Negotiation, req.negotiation_id)
-        if neg and neg.clearing_price:
-            settled_price = neg.clearing_price
+    settled_price = _settled_price(db, asset, req.negotiation_id)
     lead_time_days = max(0, (req.starts_at.replace(tzinfo=None) - datetime.utcnow()).days)
     db.add(PricingHistory(
         id=str(uuid.uuid4()),
@@ -133,6 +163,7 @@ def create_booking(
         starts_at=booking.starts_at,
         ends_at=booking.ends_at,
         status=booking.status,
+        payment_status=booking.payment_status,
         created_at=booking.created_at,
         asset_title=asset.title,
     )
@@ -161,7 +192,93 @@ def list_bookings(
             starts_at=b.starts_at,
             ends_at=b.ends_at,
             status=b.status,
+            payment_status=b.payment_status,
             created_at=b.created_at,
             asset_title=asset.title if asset else None,
         ))
     return result
+
+
+def _get_own_booking(db: Session, booking_id: str, current_user: User) -> Booking:
+    booking = db.get(Booking, booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.seeker_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your booking")
+    return booking
+
+
+@router.post("/{booking_id}/create-order", response_model=CreateOrderResponse)
+def create_order(
+    booking_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Real Razorpay Test Mode order for this booking's negotiated price."""
+    booking = _get_own_booking(db, booking_id, current_user)
+    if booking.payment_status == "paid":
+        raise HTTPException(status_code=409, detail="This booking is already paid")
+
+    asset = db.get(Asset, booking.asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    amount = _settled_price(db, asset, booking.negotiation_id)
+    order = razorpay_service.create_order(
+        amount_rupees=amount,
+        receipt=booking.id,
+        notes={"booking_id": booking.id, "asset_id": asset.id},
+    )
+    booking.razorpay_order_id = order["id"]
+    db.commit()
+
+    return CreateOrderResponse(
+        order_id=order["id"],
+        amount=order["amount"],
+        currency=order["currency"],
+        key_id=os.environ.get("RAZORPAY_KEY_ID", ""),
+    )
+
+
+@router.post("/{booking_id}/verify-payment", response_model=BookingOut)
+def verify_payment(
+    booking_id: str,
+    req: VerifyPaymentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    The ONLY place a booking is ever marked Paid — real server-side HMAC
+    SHA256 signature verification (Rule 12). The client-side Checkout
+    success callback alone is never sufficient; an invalid signature is
+    correctly rejected rather than trusted.
+    """
+    booking = _get_own_booking(db, booking_id, current_user)
+    if booking.razorpay_order_id != req.razorpay_order_id:
+        raise HTTPException(status_code=400, detail="Order id does not match this booking")
+
+    if not razorpay_service.verify_signature(
+        req.razorpay_order_id, req.razorpay_payment_id, req.razorpay_signature,
+    ):
+        booking.payment_status = "failed"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Payment signature verification failed")
+
+    booking.payment_status = "paid"
+    booking.razorpay_payment_id = req.razorpay_payment_id
+    db.commit()
+    db.refresh(booking)
+
+    asset = db.get(Asset, booking.asset_id)
+    return BookingOut(
+        id=booking.id,
+        asset_id=booking.asset_id,
+        negotiation_id=booking.negotiation_id,
+        seeker_id=booking.seeker_id,
+        starts_at=booking.starts_at,
+        ends_at=booking.ends_at,
+        status=booking.status,
+        payment_status=booking.payment_status,
+        created_at=booking.created_at,
+        asset_title=asset.title if asset else None,
+    )

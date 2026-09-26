@@ -161,6 +161,11 @@ class Booking(Base):
     starts_at       = Column(DateTime, nullable=False)
     ends_at         = Column(DateTime, nullable=False)
     status          = Column(String, default="confirmed")  # "confirmed" | "cancelled"
+    # Phase 38 (Addendum 4): real Razorpay payment. Never set to "paid" except
+    # by a real server-side HMAC signature verification succeeding.
+    payment_status     = Column(String, default="pending")  # "pending" | "paid" | "failed"
+    razorpay_order_id   = Column(String, nullable=True)
+    razorpay_payment_id = Column(String, nullable=True)
     created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     __table_args__ = (
         CheckConstraint("ends_at > starts_at", name="chk_booking_order"),
