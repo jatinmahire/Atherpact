@@ -11,7 +11,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { MapPin, Loader2, Star, Repeat, BadgeCheck } from 'lucide-react'
 import { listingsAPI, reviewsAPI, listingImageUrl } from '../api/client'
 import type { Listing, ProviderReviews, RecurringAvailabilityRule, MatchResultItem, BundlingSuggestion } from '../api/client'

@@ -5,6 +5,16 @@
   --color-lavender: #C7CEEA;
   --color-navy-light: #2F52A0;
   --color-navy-dark: #16294F;
+
+  /* Landing page design brief tokens (scoped to Landing.tsx only — no
+     other page references these, so nothing else changes). */
+  --color-espresso: #161310;
+  --color-stone: #F3EEE4;
+  --color-brass: #B8925A;
+  --color-wine: #6B2B2B;
+  --color-sage: #4F7A5B;
+  --color-ink: #211D18;
+  --color-warm-white: #F3EFE6;
 }
 
 * {
@@ -20,6 +30,16 @@ body {
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+}
+
+/* Landing page design brief: two type families, scoped via these classes
+   only — no other page uses them, so nothing else changes. */
+.font-display { font-family: 'Fraunces', Georgia, serif; }
+.font-body { font-family: 'Archivo', system-ui, sans-serif; }
+
+@keyframes landing-hero-zoom {
+  from { transform: scale(1); }
+  to   { transform: scale(1.06); }
 }
 
 /* Custom scrollbar */
