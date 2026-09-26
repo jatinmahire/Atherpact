@@ -7,9 +7,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle, AlertTriangle, Loader2, Eye, ArrowLeft, Video, X } from 'lucide-react'
+import { Camera, Upload, CheckCircle, AlertTriangle, Loader2, Eye, ArrowLeft, Video, X, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { bookingsAPI, auditAPI } from '../api/client'
-import type { BookingItem, AuditSummary } from '../api/client'
+import type { BookingItem, AuditSummary, TriageLabel } from '../api/client'
 import { authStore } from '../store/auth'
 
 interface ChangeBox {
@@ -32,6 +32,9 @@ export default function AuditPage() {
   const [auditResult, setAuditResult] = useState<AuditSummary | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+  // Phase 14 (Addendum 2): active-learning triage — {region_index: label}
+  const [triageDone, setTriageDone] = useState<Record<number, TriageLabel>>({})
+  const [triagingRegion, setTriagingRegion] = useState<number | null>(null)
 
   const checkinRef = useRef<HTMLInputElement>(null)
   const checkoutRef = useRef<HTMLInputElement>(null)
@@ -125,6 +128,19 @@ export default function AuditPage() {
     ? JSON.parse(auditResult.change_regions)
     : []
 
+  const handleTriage = async (regionIndex: number, label: TriageLabel) => {
+    if (!auditResult?.checkout) return
+    setTriagingRegion(regionIndex)
+    try {
+      await auditAPI.triage(auditResult.checkout.id, regionIndex, label)
+      setTriageDone((p) => ({ ...p, [regionIndex]: label }))
+    } catch {
+      setError('Could not save that review label')
+    } finally {
+      setTriagingRegion(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-lavender/10">
       {/* Nav */}
@@ -209,7 +225,7 @@ export default function AuditPage() {
           </div>
         ) : (
           <div>
-            <button onClick={() => { setSelected(null); setCheckinDone(false); setCheckinFile(null); setCheckoutFile(null); setAuditResult(null) }}
+            <button onClick={() => { setSelected(null); setCheckinDone(false); setCheckinFile(null); setCheckoutFile(null); setAuditResult(null); setTriageDone({}) }}
               className="flex items-center gap-1 text-sm text-navy font-medium hover:underline mb-6">
               <ArrowLeft size={14} /> Back to bookings
             </button>
@@ -350,13 +366,38 @@ export default function AuditPage() {
                   )}
 
                   {changeBoxes.length > 0 && (
-                    <div className="text-xs text-gray-500 space-y-1">
+                    <div className="text-xs text-gray-500 space-y-2">
                       <p className="font-medium text-gray-700">Change regions (bounding boxes):</p>
                       {changeBoxes.map((box, i) => (
-                        <div key={i} className="bg-gray-50 rounded px-2 py-1 font-mono">
-                          Region {i + 1}: x={box.x}, y={box.y}, {box.w}×{box.h}px
+                        <div key={i} className="bg-gray-50 rounded-lg px-2.5 py-2 flex items-center justify-between gap-2">
+                          <span className="font-mono">
+                            Region {i + 1}: x={box.x}, y={box.y}, {box.w}×{box.h}px
+                          </span>
+                          {triageDone[i] ? (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
+                              triageDone[i] === 'dispute_accepted' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            }`}>
+                              {triageDone[i] === 'dispute_accepted' ? 'Marked: confirmed change' : 'Marked: false alarm'}
+                            </span>
+                          ) : (
+                            <div className="flex gap-1.5 shrink-0">
+                              <button onClick={() => handleTriage(i, 'false_alarm')} disabled={triagingRegion === i}
+                                className="flex items-center gap-1 text-xs bg-white border border-gray-200 px-2 py-1 rounded-lg hover:border-green-300 hover:text-green-700 transition-colors disabled:opacity-50">
+                                {triagingRegion === i ? <Loader2 size={11} className="animate-spin" /> : <ThumbsDown size={11} />} False alarm
+                              </button>
+                              <button onClick={() => handleTriage(i, 'dispute_accepted')} disabled={triagingRegion === i}
+                                className="flex items-center gap-1 text-xs bg-white border border-gray-200 px-2 py-1 rounded-lg hover:border-red-300 hover:text-red-700 transition-colors disabled:opacity-50">
+                                {triagingRegion === i ? <Loader2 size={11} className="animate-spin" /> : <ThumbsUp size={11} />} Confirm change
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
+                      <p className="text-[11px] text-gray-400 pt-1">
+                        Your review here only saves labeled examples for a future vision-classifier
+                        training pass — it doesn't retrain anything now, and this result was already
+                        decided by the OpenCV pipeline above.
+                      </p>
                     </div>
                   )}
 

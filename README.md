@@ -178,3 +178,17 @@ Everything is fully offline once `scripts/setup_models.py` has populated `models
 - **Seed data committed in two transactions:** SQLite FK enforcement requires the referenced User to exist before Assets can be inserted
 - **LLM receives only clearing_price + terms:** Strict separation means the model cannot influence the price, which is computed purely by arithmetic first
 - **Laya always advisory:** Every Laya output has a neutral fallback; the app never crashes or blocks on Laya unavailability
+- **`faiss-cpu` instead of `hnswlib` for the semantic-search vector index:** `hnswlib` has no prebuilt wheel for Windows/Python 3.12 and needs a C++ compiler this dev machine doesn't have. `faiss-cpu`'s `IndexHNSWFlat` is the same HNSW algorithm with a real prebuilt wheel.
+
+---
+
+## Active-Learning Vision Triage (Phase 14)
+
+The audit review UI (`/audit`) lets you mark each flagged region as **False alarm** or **Confirm change** after reviewing it. This does two things, and nothing else:
+
+1. Crops that region's tile from the checkout photo and saves it to `backend/data/vision_triage/<false_alarm|dispute_accepted>/<audit_id>_<region_index>.jpg`.
+2. Records the label on that `audit_logs` row (re-labeling a region removes its old tile from the previous label's folder, so the dataset never accumulates a stale, contradictory copy).
+
+**This does not train anything.** It only builds the labeled dataset a future MobileNetV3 fine-tuning pass (`train_vision_classifier.py`, not yet written) would consume. The OpenCV pipeline in `services/visual_diff.py` is and remains the only thing that decides `change_detected` — triage labels never feed back into that decision.
+
+**Don't attempt training on this data yet.** As a rough floor, don't bother running a fine-tuning pass until you have at least a few hundred labeled tiles *per class* (`false_alarm` and `dispute_accepted` each) — anything less and a MobileNetV3 head will just overfit to your specific test photos rather than learning anything that generalizes.

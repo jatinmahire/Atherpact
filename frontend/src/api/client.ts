@@ -194,8 +194,11 @@ export interface AuditEvent {
   image_path: string | null
   change_regions: string | null
   alignment_unavailable: boolean
+  triage_labels: string | null
   created_at: string
 }
+
+export type TriageLabel = 'false_alarm' | 'dispute_accepted'
 
 export interface AuditSummary {
   booking_id: string
@@ -233,4 +236,7 @@ export const auditAPI = {
 
   get: (bookingId: string) =>
     api.get<AuditSummary>(`/audit/${bookingId}`),
+
+  triage: (auditLogId: string, regionIndex: number, label: TriageLabel) =>
+    api.post(`/audit/${auditLogId}/triage`, { region_index: regionIndex, label }),
 }

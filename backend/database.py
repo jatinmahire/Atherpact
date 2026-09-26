@@ -162,6 +162,12 @@ class AuditLog(Base):
     # Phase 11 (Addendum 2): True when ORB found too few feature matches to
     # align the pair safely — surfaced honestly rather than silently ignored.
     alignment_unavailable = Column(Boolean, default=False)
+    # Phase 14 (Addendum 2): human triage labels for this event's flagged
+    # regions, JSON dict {"<region_index>": "false_alarm"|"dispute_accepted"}.
+    # Feeds the labeled-data pipeline for a later (not-yet-trained) vision
+    # classifier — never trained automatically, never used to change this
+    # event's own change_detected result.
+    triage_labels  = Column(Text, nullable=True)
     created_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

@@ -176,6 +176,7 @@ class AuditEventOut(BaseModel):
     image_path: Optional[str]
     change_regions: Optional[str]
     alignment_unavailable: bool = False
+    triage_labels: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -189,3 +190,17 @@ class AuditSummary(BaseModel):
     change_detected: bool
     change_regions: Optional[str]
     alignment_unavailable: bool = False
+
+
+# ── Audit Triage (Phase 14, Addendum 2) ────────────────────────────────────────
+
+class AuditTriageRequest(BaseModel):
+    region_index: int = Field(ge=0)
+    label: str = Field(pattern=r"^(false_alarm|dispute_accepted)$")
+
+
+class AuditTriageResponse(BaseModel):
+    audit_log_id: str
+    region_index: int
+    label: str
+    tile_path: str
