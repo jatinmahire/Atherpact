@@ -142,6 +142,9 @@ class AuditLog(Base):
     event_type     = Column(String, nullable=False)    # "checkin" | "checkout"
     image_path     = Column(String, nullable=True)
     change_regions = Column(Text, nullable=True)       # JSON list of bounding boxes
+    # Phase 11 (Addendum 2): True when ORB found too few feature matches to
+    # align the pair safely — surfaced honestly rather than silently ignored.
+    alignment_unavailable = Column(Boolean, default=False)
     created_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

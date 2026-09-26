@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, CheckCircle, AlertTriangle, Loader2, Eye, ArrowLeft } from 'lucide-react'
+import { Camera, Upload, CheckCircle, AlertTriangle, Loader2, Eye, ArrowLeft, Video, X } from 'lucide-react'
 import { bookingsAPI, auditAPI } from '../api/client'
 import type { BookingItem, AuditSummary } from '../api/client'
 import { authStore } from '../store/auth'
@@ -35,6 +35,16 @@ export default function AuditPage() {
 
   const checkinRef = useRef<HTMLInputElement>(null)
   const checkoutRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  // Phase 11 (Addendum 2): onion-skin camera guidance for check-out capture.
+  // Pure UI aid — overlays the check-in photo at low opacity on the live
+  // preview so the operator can match framing; does not touch what gets
+  // uploaded or how the backend processes it.
+  const [cameraActive, setCameraActive] = useState(false)
+  const [cameraError, setCameraError] = useState('')
 
   useEffect(() => {
     if (!authStore.getToken()) { nav('/login'); return }
@@ -43,6 +53,45 @@ export default function AuditPage() {
       .catch(() => setError('Could not load bookings'))
       .finally(() => setLoadingBookings(false))
   }, [])
+
+  useEffect(() => {
+    // Stop the camera stream on unmount / booking change to release the device.
+    return () => stopCamera()
+  }, [])
+
+  const startCamera = async () => {
+    setCameraError('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      streamRef.current = stream
+      setCameraActive(true)
+      if (videoRef.current) videoRef.current.srcObject = stream
+    } catch (err: any) {
+      setCameraError(err?.message ?? 'Could not access camera')
+    }
+  }
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    setCameraActive(false)
+  }
+
+  const capturePhoto = () => {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas) return
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      setCheckoutFile(new File([blob], `checkout_camera_${Date.now()}.jpg`, { type: 'image/jpeg' }))
+      stopCamera()
+    }, 'image/jpeg', 0.92)
+  }
 
   const handleCheckin = async () => {
     if (!selected || !checkinFile) return
@@ -215,9 +264,35 @@ export default function AuditPage() {
                 </h3>
                 <input ref={checkoutRef} type="file" accept="image/*" className="hidden"
                   onChange={(e) => setCheckoutFile(e.target.files?.[0] ?? null)} />
+                <canvas ref={canvasRef} className="hidden" />
                 {!checkinDone ? (
                   <div className="w-full h-48 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-300 text-sm">
                     Upload check-in photo first
+                  </div>
+                ) : cameraActive ? (
+                  <div className="space-y-2">
+                    <div className="relative w-full h-48 rounded-xl overflow-hidden bg-black">
+                      <video ref={videoRef} autoPlay playsInline muted
+                        className="w-full h-full object-cover" />
+                      {checkinFile && (
+                        <img src={URL.createObjectURL(checkinFile)} alt="Check-in guide overlay"
+                          className="absolute inset-0 w-full h-full object-cover opacity-[0.375] pointer-events-none"
+                        />
+                      )}
+                      <p className="absolute bottom-1.5 left-1.5 text-[10px] bg-black/50 text-white px-2 py-0.5 rounded-full">
+                        Line up the faded check-in photo, then capture
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={capturePhoto}
+                        className="flex-1 bg-navy text-white py-2 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
+                        <Camera size={14} /> Capture
+                      </button>
+                      <button onClick={stopCamera}
+                        className="px-3 py-2 rounded-xl text-sm text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-1">
+                        <X size={14} /> Cancel
+                      </button>
+                    </div>
                   </div>
                 ) : checkoutFile ? (
                   <div className="space-y-3">
@@ -226,11 +301,18 @@ export default function AuditPage() {
                     <p className="text-xs text-gray-500 truncate">{checkoutFile.name}</p>
                   </div>
                 ) : (
-                  <button onClick={() => checkoutRef.current?.click()}
-                    className="w-full h-48 border-2 border-dashed border-lavender rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-navy hover:text-navy transition-colors">
-                    <Upload size={24} />
-                    <span className="text-sm">Upload check-out photo</span>
-                  </button>
+                  <div className="space-y-2">
+                    <button onClick={() => checkoutRef.current?.click()}
+                      className="w-full h-48 border-2 border-dashed border-lavender rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-navy hover:text-navy transition-colors">
+                      <Upload size={24} />
+                      <span className="text-sm">Upload check-out photo</span>
+                    </button>
+                    <button onClick={startCamera}
+                      className="w-full flex items-center justify-center gap-1.5 text-xs text-navy font-medium hover:underline">
+                      <Video size={13} /> Or use camera with check-in overlay guide
+                    </button>
+                    {cameraError && <p className="text-xs text-red-500">{cameraError}</p>}
+                  </div>
                 )}
                 {checkoutFile && !auditResult && checkinDone && (
                   <button onClick={handleCheckout} disabled={uploading}
@@ -275,6 +357,17 @@ export default function AuditPage() {
                           Region {i + 1}: x={box.x}, y={box.y}, {box.w}×{box.h}px
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {auditResult.alignment_unavailable && (
+                    <div className="mt-3 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 text-xs text-orange-700 flex items-start gap-2">
+                      <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                      <span>
+                        Too few matching features found between the two photos to align them
+                        before comparing — the result above may be affected by camera angle,
+                        not just genuine changes. Retake with closer framing for a more reliable result.
+                      </span>
                     </div>
                   )}
                 </motion.div>

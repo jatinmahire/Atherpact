@@ -91,8 +91,8 @@ async def checkout(
 
     img_path = _save_upload(image, f"checkout_{booking_id}_{uuid.uuid4().hex}.jpg")
 
-    # Run visual change detection
-    change_detected, boxes = detect_changes(checkin_log.image_path, str(img_path))
+    # Run visual change detection (with ORB feature alignment first)
+    change_detected, boxes, alignment_unavailable = detect_changes(checkin_log.image_path, str(img_path))
     boxes_json = json.dumps(boxes)
 
     log = AuditLog(
@@ -101,6 +101,7 @@ async def checkout(
         event_type="checkout",
         image_path=str(img_path),
         change_regions=boxes_json,
+        alignment_unavailable=alignment_unavailable,
     )
     db.add(log)
     db.commit()
@@ -112,6 +113,7 @@ async def checkout(
         checkout=log,
         change_detected=change_detected,
         change_regions=boxes_json if change_detected else None,
+        alignment_unavailable=alignment_unavailable,
     )
 
 
@@ -140,4 +142,5 @@ def get_audit(booking_id: str, db: Session = Depends(get_db)):
         checkout=checkout,
         change_detected=change_detected,
         change_regions=change_regions,
+        alignment_unavailable=bool(checkout.alignment_unavailable) if checkout else False,
     )

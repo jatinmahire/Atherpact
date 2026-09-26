@@ -138,6 +138,7 @@ class AuditEventOut(BaseModel):
     event_type: str
     image_path: Optional[str]
     change_regions: Optional[str]
+    alignment_unavailable: bool = False
     created_at: datetime
 
     class Config:
@@ -150,3 +151,4 @@ class AuditSummary(BaseModel):
     checkout: Optional[AuditEventOut]
     change_detected: bool
     change_regions: Optional[str]
+    alignment_unavailable: bool = False

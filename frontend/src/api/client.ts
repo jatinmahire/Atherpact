@@ -159,6 +159,7 @@ export interface AuditEvent {
   event_type: string
   image_path: string | null
   change_regions: string | null
+  alignment_unavailable: boolean
   created_at: string
 }
 
@@ -168,6 +169,13 @@ export interface AuditSummary {
   checkout: AuditEvent | null
   change_detected: boolean
   change_regions: string | null
+  alignment_unavailable: boolean
+}
+
+/** Builds a browsable URL for a stored audit image_path (may contain OS-specific separators). */
+export function auditImageUrl(imagePath: string): string {
+  const filename = imagePath.split(/[\\/]/).pop()
+  return `/audit_images/${filename}`
 }
 
 export const auditAPI = {
