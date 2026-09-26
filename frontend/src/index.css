@@ -65,6 +65,30 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Landing page update — card hover shine (Part 1, Section 1): a diagonal
+   light-sweep on hover, GPU-accelerated (transform only). Reduced-motion
+   users just don't get the sweep — the card itself is unaffected either
+   way, so nothing is lost functionally. */
+.card-shine {
+  position: relative;
+}
+.card-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.35) 50%, transparent 60%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .card-shine::after {
+    transition: transform 550ms ease;
+  }
+  .card-shine:hover::after {
+    transform: translateX(120%);
+  }
+}
+
 /* Kept for explicit opt-in use (e.g. Landing's hero, which sets these on
    non-heading elements too); redundant with the global body/heading rules
    above for most cases, harmless where still referenced. */

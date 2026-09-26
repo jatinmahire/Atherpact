@@ -53,9 +53,12 @@ export default function Navbar() {
           <>
             <button onClick={() => nav(user.role === 'provider' ? '/provider' : '/explore')}
               className="text-sm text-navy font-medium hover:underline">Dashboard</button>
-            <div className="w-8 h-8 rounded-full bg-lavender/40 flex items-center justify-center text-xs font-bold text-navy">
-              {user.display_name?.[0]?.toUpperCase() ?? '?'}
-            </div>
+            {/* Real authenticated user's name, replacing the logged-out
+                Sign in/Register links — styled with the theme accent, only
+                ever shown when authStore genuinely has a signed-in user. */}
+            <span className="text-sm font-semibold text-navy bg-navy/10 px-3 py-1.5 rounded-full">
+              {user.display_name}
+            </span>
             <button onClick={() => { authStore.logout(); nav('/') }}
               className="text-sm text-gray-500 hover:text-navy transition-colors">Sign out</button>
           </>

@@ -17,7 +17,15 @@
 
 import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import {
+  motion,
+  MotionConfig,
+  useReducedMotion,
+  useMotionValue,
+  useSpring,
+  useScroll,
+  useTransform,
+} from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 // Fraunces/Archivo are now loaded globally from main.tsx (Addendum 7).
 import ChatWidget from '../components/ChatWidget'
@@ -54,20 +62,54 @@ const WHY = [
 ]
 
 
+// Landing Page Update (Part 1, Section 3): pointer-relative 3D tilt, shared
+// by the hero floating card and each category tile. Uses raw motion values
+// updated imperatively on mousemove (not React state) so hover doesn't
+// trigger a re-render on every pixel of movement — the spring smoothing is
+// what makes it feel physical rather than snapping to the pointer.
+function useTilt() {
+  const prefersReducedMotion = useReducedMotion()
+  const ref = useRef<HTMLDivElement>(null)
+  const rawRotateX = useMotionValue(0)
+  const rawRotateY = useMotionValue(0)
+  const rotateX = useSpring(rawRotateX, { stiffness: 300, damping: 25 })
+  const rotateY = useSpring(rawRotateY, { stiffness: 300, damping: 25 })
+
+  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (prefersReducedMotion || !ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    const px = (e.clientX - rect.left) / rect.width - 0.5
+    const py = (e.clientY - rect.top) / rect.height - 0.5
+    rawRotateX.set(py * -10)
+    rawRotateY.set(px * 10)
+  }
+  const onMouseLeave = () => {
+    rawRotateX.set(0)
+    rawRotateY.set(0)
+  }
+
+  return { ref, rotateX, rotateY, onMouseMove, onMouseLeave }
+}
+
 function FloatingResourceCard({ item }: { item: MatchResultItem | null }) {
   const [cardShown, setCardShown] = useState(false)
   const pct = item ? Math.round(item.scores.final_score * 100) : 0
   const countedPct = useCountUp(pct, cardShown)
+  const tilt = useTilt()
 
   if (!item) return null
 
   return (
     <motion.div
+      ref={tilt.ref}
+      onMouseMove={tilt.onMouseMove}
+      onMouseLeave={tilt.onMouseLeave}
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1.1, duration: 0.6, ease: 'easeOut' }}
       onAnimationComplete={() => setCardShown(true)}
-      className="glass-surface absolute bottom-6 right-4 sm:bottom-10 sm:right-10 w-64 p-4 font-body overflow-hidden"
+      style={{ rotateX: tilt.rotateX, rotateY: tilt.rotateY, transformPerspective: 800, willChange: 'transform' }}
+      className="card-shine glass-surface absolute bottom-6 right-4 sm:bottom-10 sm:right-10 w-64 p-4 font-body overflow-hidden"
     >
       {/* Scrim: the hero photo behind this card is busy, so text needs its
           own darkening layer underneath, independent of the glass blur. */}
@@ -81,6 +123,57 @@ function FloatingResourceCard({ item }: { item: MatchResultItem | null }) {
         </div>
       </div>
     </motion.div>
+  )
+}
+
+// Category tile: same tilt treatment plus a ~0.85x scroll parallax on the
+// image layer only (the caption/gradient stay put so text never blurs by
+// drifting out of its box). Parallax reads scroll progress through
+// useScroll rather than a scroll event listener, so there's nothing to
+// throttle or debounce by hand.
+function CategoryTile({ c }: { c: (typeof CATEGORIES)[number] }) {
+  const prefersReducedMotion = useReducedMotion()
+  const tilt = useTilt()
+  const { scrollYProgress } = useScroll({ target: tilt.ref, offset: ['start end', 'end start'] })
+  const parallaxY = useTransform(scrollYProgress, [0, 1], prefersReducedMotion ? [0, 0] : [-16, 16])
+
+  return (
+    <motion.div
+      ref={tilt.ref}
+      onMouseMove={tilt.onMouseMove}
+      onMouseLeave={tilt.onMouseLeave}
+      style={{ rotateX: tilt.rotateX, rotateY: tilt.rotateY, transformPerspective: 800, willChange: 'transform' }}
+      className={`card-shine relative rounded-xl overflow-hidden ${c.span}`}
+    >
+      <motion.img
+        src={c.img}
+        alt={c.title}
+        width={c.w}
+        height={c.h}
+        loading="lazy"
+        style={{ y: parallaxY, scale: 1.12, willChange: 'transform' }}
+        className="w-full h-56 md:h-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-espresso/80 via-transparent to-transparent" />
+      <span className="absolute bottom-4 left-4 font-display text-warm-white text-lg">{c.title}</span>
+    </motion.div>
+  )
+}
+
+// Restrained scroll fade-in for each major section: 16-24px of motion,
+// under half a second, IntersectionObserver-driven (whileInView) rather
+// than a scroll listener, and never replays once triggered.
+function FadeInSection({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.45, ease: 'easeOut' }}
+      className={className}
+    >
+      {children}
+    </motion.section>
   )
 }
 
@@ -119,6 +212,7 @@ export default function Landing() {
   }, [])
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="font-body">
       {/* Glass Surface Pass: floating nav, fixed above everything. Dark-hero
           glass while over the photo, stone glass once scrolled past it —
@@ -218,28 +312,17 @@ export default function Landing() {
       {/* ── BODY: warm stone, quiet and legible ── */}
       <main className="bg-stone text-ink">
         {/* Resource categories — asymmetric editorial grid */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-8 py-20">
+        <FadeInSection className="max-w-6xl mx-auto px-4 sm:px-8 py-20">
           <h2 className="font-display text-3xl mb-10">What businesses share on AetherPact</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:grid-rows-2">
             {CATEGORIES.map((c) => (
-              <div key={c.title} className={`relative rounded-xl overflow-hidden group ${c.span}`}>
-                <img
-                  src={c.img}
-                  alt={c.title}
-                  width={c.w}
-                  height={c.h}
-                  loading="lazy"
-                  className="w-full h-56 md:h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-espresso/80 via-transparent to-transparent" />
-                <span className="absolute bottom-4 left-4 font-display text-warm-white text-lg">{c.title}</span>
-              </div>
+              <CategoryTile key={c.title} c={c} />
             ))}
           </div>
-        </section>
+        </FadeInSection>
 
         {/* How AetherPact Works — the one place numbered steps belong */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-8 py-20">
+        <FadeInSection className="max-w-6xl mx-auto px-4 sm:px-8 py-20">
           <h2 className="font-display text-3xl mb-10">How AetherPact Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-10">
             {STEPS.map((s, i) => (
@@ -252,10 +335,10 @@ export default function Landing() {
               </div>
             ))}
           </div>
-        </section>
+        </FadeInSection>
 
         {/* Why AetherPact — plain claims, one layered detail photo */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-8 py-20 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-12 items-start">
+        <FadeInSection className="max-w-6xl mx-auto px-4 sm:px-8 py-20 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-12 items-start">
           <div>
             <h2 className="font-display text-3xl mb-10">Why AetherPact</h2>
             <div className="space-y-8">
@@ -277,10 +360,10 @@ export default function Landing() {
               className="w-full rounded-lg rotate-2 shadow-[0_25px_60px_-15px_rgba(22,19,16,0.45)]"
             />
           </div>
-        </section>
+        </FadeInSection>
 
         {/* Statistics — labeled honestly as demo/example unless real */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-8 py-16">
+        <FadeInSection className="max-w-6xl mx-auto px-4 sm:px-8 py-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div>
               <div className="font-display text-4xl text-brass">5</div>
@@ -300,10 +383,10 @@ export default function Landing() {
             </div>
           </div>
           <p className="text-ink/40 text-xs text-center mt-6">*Illustrative example, not a live company-wide statistic.</p>
-        </section>
+        </FadeInSection>
 
         {/* Closing CTA — bookends the cinematic hero */}
-        <section className="bg-espresso text-warm-white py-20">
+        <FadeInSection className="bg-espresso text-warm-white py-20">
           <div className="max-w-3xl mx-auto px-4 text-center">
             <h2 className="font-display text-3xl sm:text-4xl mb-8">Turn idle capacity into opportunity.</h2>
             <div className="flex gap-3 justify-center flex-wrap">
@@ -315,10 +398,11 @@ export default function Landing() {
               </button>
             </div>
           </div>
-        </section>
+        </FadeInSection>
       </main>
 
       <ChatWidget />
     </div>
+    </MotionConfig>
   )
 }
