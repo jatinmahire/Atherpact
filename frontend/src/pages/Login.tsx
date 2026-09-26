@@ -37,7 +37,7 @@ export default function Login() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl shadow-lg border border-lavender/20 p-8 w-full max-w-md"
+        className="bg-white rounded-2xl shadow-lg border border-lavender/20 p-6 w-full max-w-md"
       >
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
