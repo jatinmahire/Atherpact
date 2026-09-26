@@ -4,11 +4,12 @@
  * CTA buttons, and floating chat widget.
  */
 
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Zap, Shield, BarChart3 } from 'lucide-react'
 import ChatWidget from '../components/ChatWidget'
+import { authStore } from '../store/auth'
 
 // Lazy-load the 3D scene so the page hydrates instantly
 const HeroScene = lazy(() => import('../components/HeroScene'))
@@ -33,6 +34,11 @@ const features = [
 
 export default function Landing() {
   const nav = useNavigate()
+  const [user, setUser] = useState(authStore.getUser())
+
+  useEffect(() => {
+    return authStore.subscribe(() => setUser(authStore.getUser()))
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-lavender/10">
@@ -57,18 +63,32 @@ export default function Landing() {
           >
             Verify
           </button>
-          <button
-            onClick={() => nav('/login')}
-            className="text-sm text-navy font-medium hover:underline"
-          >
-            Sign in
-          </button>
-          <button
-            onClick={() => nav('/register')}
-            className="text-sm bg-navy text-white px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors"
-          >
-            Get Started
-          </button>
+          {user ? (
+            <>
+              <span className="text-sm text-gray-500">{user.display_name}</span>
+              <button
+                onClick={() => { authStore.logout(); nav('/') }}
+                className="text-sm text-navy font-medium hover:underline"
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => nav('/login')}
+                className="text-sm text-navy font-medium hover:underline"
+              >
+                Sign in
+              </button>
+              <button
+                onClick={() => nav('/register')}
+                className="text-sm bg-navy text-white px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors"
+              >
+                Get Started
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
