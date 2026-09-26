@@ -126,6 +126,13 @@ class NegotiateRequest(BaseModel):
     seeker_offer: float = Field(gt=0)
     seeker_max: float = Field(gt=0)
     extra_terms: Optional[str] = None
+    multi_round: bool = False  # Phase 13 (Addendum 2): opt into the multi-round concession mode
+
+
+class NegotiationRound(BaseModel):
+    round: int
+    provider_ask: float
+    seeker_offer: float
 
 
 class NegotiateResponse(BaseModel):
@@ -135,6 +142,14 @@ class NegotiateResponse(BaseModel):
     extra_terms: Optional[str]
     dispute_risk_badge: Optional[str]  # advisory from Laya (Phase 5)
     negotiation_id: str
+    rounds_log: Optional[List[NegotiationRound]] = None  # present only when multi_round=True
+
+
+class SmartSuggestionOut(BaseModel):
+    has_suggestion: bool
+    suggested_anchor: Optional[float] = None
+    based_on: Optional[int] = None
+    reason: Optional[str] = None
 
 
 # ── Chat / Intent ──────────────────────────────────────────────────────────────

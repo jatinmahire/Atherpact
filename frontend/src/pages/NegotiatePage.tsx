@@ -4,11 +4,11 @@
  * Visually separated so it's clear which parts are deterministic and which advisory.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, AlertTriangle, Info, Sparkles, Repeat } from 'lucide-react'
 import { negotiateAPI, bookingsAPI } from '../api/client'
-import type { MatchResultItem, NegotiateResponse } from '../api/client'
+import type { MatchResultItem, NegotiateResponse, SmartSuggestion } from '../api/client'
 
 interface Props {
   item: MatchResultItem
@@ -40,9 +40,21 @@ export default function NegotiatePage({ item, onClose }: Props) {
   const [error, setError]     = useState('')
   const [booking, setBooking] = useState(false)
   const [booked, setBooked]   = useState(false)
+  const [multiRound, setMultiRound] = useState(false)
+  const [smartSuggestion, setSmartSuggestion] = useState<SmartSuggestion | null>(null)
+
+  useEffect(() => {
+    negotiateAPI.smartSuggestion(asset.id).then((res) => setSmartSuggestion(res.data)).catch(() => {})
+  }, [asset.id])
 
   const update = (f: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((p) => ({ ...p, [f]: e.target.value }))
+
+  const applySmartSuggestion = () => {
+    if (smartSuggestion?.suggested_anchor) {
+      setForm((p) => ({ ...p, provider_ask: String(Math.round(smartSuggestion.suggested_anchor!)) }))
+    }
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,6 +68,7 @@ export default function NegotiatePage({ item, onClose }: Props) {
         seeker_offer: parseFloat(form.seeker_offer),
         seeker_max:   parseFloat(form.seeker_max),
         extra_terms:  form.extra_terms || undefined,
+        multi_round:  multiRound,
       })
       setResult(res.data)
     } catch (err: any) {
@@ -87,6 +100,20 @@ export default function NegotiatePage({ item, onClose }: Props) {
         <div className="p-6">
           {!result ? (
             <form onSubmit={submit} className="space-y-4">
+              {smartSuggestion?.has_suggestion && (
+                <div className="bg-lavender/10 border border-lavender/30 rounded-xl px-3 py-2.5 flex items-start gap-2">
+                  <Sparkles size={14} className="text-navy mt-0.5 shrink-0" />
+                  <div className="flex-1 text-xs text-gray-600">
+                    <span className="font-medium text-navy">Smart mode</span> suggests an opening ask of{' '}
+                    <span className="font-semibold">₹{smartSuggestion.suggested_anchor?.toLocaleString('en-IN')}</span>
+                    <p className="text-gray-400 mt-0.5">{smartSuggestion.reason}</p>
+                  </div>
+                  <button type="button" onClick={applySmartSuggestion}
+                    className="text-xs bg-navy text-white px-2.5 py-1 rounded-lg font-medium shrink-0 hover:bg-navy-light transition-colors">
+                    Use this
+                  </button>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Provider Ask (₹/day)</label>
@@ -115,6 +142,12 @@ export default function NegotiatePage({ item, onClose }: Props) {
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-navy resize-none"
                   placeholder="e.g. Security deposit ₹5000, no loud music after 10pm…" />
               </div>
+
+              <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                <input type="checkbox" checked={multiRound} onChange={(e) => setMultiRound(e.target.checked)}
+                  className="rounded border-gray-300 text-navy focus:ring-navy" />
+                <Repeat size={12} /> Multi-round mode (both sides concede gradually over up to 3 rounds)
+              </label>
 
               {error && <div className="text-red-600 text-sm bg-red-50 rounded-xl px-3 py-2">{error}</div>}
 
@@ -149,6 +182,16 @@ export default function NegotiatePage({ item, onClose }: Props) {
                       <p className="text-xs text-gray-400 mt-2">
                         Computed as: (max(provider_min, seeker_offer) + min(provider_ask, seeker_max)) / 2
                       </p>
+                      {result.rounds_log && result.rounds_log.length > 1 && (
+                        <div className="mt-3 pt-3 border-t border-navy/10 text-xs text-gray-500 space-y-1">
+                          <p className="font-medium text-gray-600 flex items-center gap-1"><Repeat size={11} /> Concession rounds:</p>
+                          {result.rounds_log.map((r) => (
+                            <div key={r.round} className="font-mono">
+                              Round {r.round}: ask ₹{r.provider_ask.toLocaleString('en-IN')} · offer ₹{r.seeker_offer.toLocaleString('en-IN')}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* ── ADVISORY SECTION ── */}

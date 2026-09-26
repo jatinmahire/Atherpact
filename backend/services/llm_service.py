@@ -1,5 +1,6 @@
 """
 AetherPact — Phase 4: LLM phrasing layer (Qwen2.5-0.5B-Instruct via llama-cpp-python).
+Phase 13 (Addendum 2): grammar-constrained decoding for the phrasing schema.
 
 IMPORTANT CONTRACT (spec rule 2):
   - The model receives ONLY the final clearing_price and optional extra_terms.
@@ -18,6 +19,26 @@ logger = logging.getLogger(__name__)
 
 _MODEL_PATH = Path(__file__).parent.parent / "models_cache" / "qwen2.5-0.5b-instruct-q4_k_m.gguf"
 _llm = None  # lazy-loaded on first call
+
+# GBNF grammar: exactly two sentences, each starting with an uppercase letter
+# and ending in ./!/? — structurally impossible for the model to emit
+# malformed output (extra sentences, no terminator, etc), instead of hoping
+# for it and patching with regex afterward.
+_TWO_SENTENCE_GRAMMAR = r"""
+root ::= sentence " " sentence
+sentence ::= [A-Z] middle [.!?]
+middle ::= middlechar*
+middlechar ::= [^.!?\n]
+"""
+_grammar = None  # lazy-loaded on first call
+
+
+def _load_grammar():
+    global _grammar
+    if _grammar is None:
+        from llama_cpp import LlamaGrammar  # type: ignore
+        _grammar = LlamaGrammar.from_string(_TWO_SENTENCE_GRAMMAR)
+    return _grammar
 
 
 def _load_llm():
@@ -76,11 +97,13 @@ def phrase_settlement(clearing_price: float, extra_terms: Optional[str]) -> str:
         return base
 
     try:
+        grammar = _load_grammar()
         output = llm(
             prompt,
             max_tokens=80,
             temperature=0.5,
             stop=["<|im_end|>", "<|im_start|>"],
+            grammar=grammar,
         )
         return output["choices"][0]["text"].strip()
     except Exception as exc:

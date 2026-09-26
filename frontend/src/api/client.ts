@@ -61,6 +61,12 @@ export interface MatchResponse {
   query: string
 }
 
+export interface NegotiationRound {
+  round: number
+  provider_ask: number
+  seeker_offer: number
+}
+
 export interface NegotiateResponse {
   status: 'settled' | 'no_deal'
   clearing_price: number | null
@@ -68,6 +74,14 @@ export interface NegotiateResponse {
   extra_terms: string | null
   dispute_risk_badge: string | null
   negotiation_id: string
+  rounds_log: NegotiationRound[] | null
+}
+
+export interface SmartSuggestion {
+  has_suggestion: boolean
+  suggested_anchor: number | null
+  based_on: number | null
+  reason: string | null
 }
 
 export interface ChatResponse {
@@ -143,7 +157,11 @@ export const negotiateAPI = {
     seeker_offer: number
     seeker_max: number
     extra_terms?: string
+    multi_round?: boolean
   }) => api.post<NegotiateResponse>('/negotiate', payload),
+
+  smartSuggestion: (assetId: string) =>
+    api.get<SmartSuggestion>(`/negotiate/smart-suggestion/${assetId}`),
 }
 
 // ─── Bookings ────────────────────────────────────────────────────────────────
