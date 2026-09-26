@@ -9,23 +9,15 @@ from datetime import datetime
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
+# Phase 37 (Addendum 4): Firebase Auth now owns account creation and password
+# verification entirely — there is no backend-issued token anymore.
 
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=6)
+class ProfileSyncRequest(BaseModel):
+    """Sent once by the frontend right after Firebase account creation, to
+    set the application-level profile fields Firebase itself doesn't track."""
     display_name: str
     role: str = "both"          # "provider" | "seeker" | "both"
     referral_code: Optional[str] = None  # another user's referral code, if any
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
 
 
 class UserOut(BaseModel):

@@ -123,11 +123,22 @@ export default function ProviderPortal() {
   const [user, setUser] = useState(authStore.getUser())
 
   useEffect(() => {
+    // Re-sync immediately — the store can change in the gap between this
+    // component's initial render and this effect subscribing (e.g. a
+    // just-completed sign-in), which subscribe() alone would miss forever.
+    setUser(authStore.getUser())
     return authStore.subscribe(() => setUser(authStore.getUser()))
   }, [])
 
   useEffect(() => {
-    if (!authStore.getToken()) nav('/login')
+    // Phase 37 (Addendum 4): must wait for Firebase to report the session at
+    // least once — otherwise a real session briefly looks logged-out during
+    // the async restore and this redirects a valid user to /login.
+    const check = () => {
+      if (authStore.isReady() && !authStore.isAuthenticated()) nav('/login')
+    }
+    check()
+    return authStore.subscribe(check)
   }, [])
 
   const [listings, setListings]         = useState<Listing[]>([])

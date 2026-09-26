@@ -38,6 +38,13 @@ export default function Landing() {
   const [user, setUser] = useState(authStore.getUser())
 
   useEffect(() => {
+    // Re-sync immediately: the store can change between this component's
+    // initial render (which snapshot authStore.getUser() once) and this
+    // effect registering — e.g. a just-completed Firebase sign-in whose
+    // async /auth/me fetch resolves in that exact gap. Without this, that
+    // update is missed forever since subscribe() only reacts to *future*
+    // notifications.
+    setUser(authStore.getUser())
     return authStore.subscribe(() => setUser(authStore.getUser()))
   }, [])
 

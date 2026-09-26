@@ -17,19 +17,20 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 import requests
 from PIL import Image
+from test_firebase_helper import firebase_id_token
 
 BASE = 'http://127.0.0.1:8000'
 
 
 def register(email, referral_code=None):
-    payload = {'email': email, 'password': 'Test123!', 'display_name': 'Verify ' + email, 'role': 'both'}
+    """Real Firebase account (Phase 37) + our app-level profile-sync call."""
+    token = firebase_id_token(email, 'Test123!')
+    payload = {'display_name': 'Verify ' + email, 'role': 'both'}
     if referral_code:
         payload['referral_code'] = referral_code
-    r = requests.post(f'{BASE}/auth/register', json=payload)
-    if r.status_code == 409:
-        r = requests.post(f'{BASE}/auth/login', json={'email': email, 'password': 'Test123!'})
+    r = requests.post(f'{BASE}/auth/register', json=payload, headers={'Authorization': f'Bearer {token}'})
     r.raise_for_status()
-    return r.json()['access_token']
+    return token
 
 
 def auth_headers(token):

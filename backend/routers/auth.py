@@ -1,41 +1,28 @@
 """
-AetherPact — Auth router (register, login, /me).
-Uses bcrypt for password hashing and HS256 JWT for session tokens.
+AetherPact — Auth router (Phase 37, Addendum 4).
+
+Firebase Authentication now owns account creation and password verification
+entirely. Every protected endpoint expects a real Firebase ID token
+(`Authorization: Bearer <token>`), verified here via the Admin SDK. On the
+first verified request from a given Firebase uid, the corresponding row in
+our own `users` table is upserted, preserving the application-level role
+(PROVIDER, SEEKER, BOTH) that Firebase itself has no concept of.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from database import get_db, User, Referral
-from models import RegisterRequest, LoginRequest, TokenResponse, UserOut, ReferralStatusOut
+from models import ProfileSyncRequest, UserOut, ReferralStatusOut
+from services.firebase_service import verify_id_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-SECRET_KEY = "aetherpact-dev-secret-change-in-prod"
-ALGORITHM  = "HS256"
-TOKEN_TTL  = timedelta(hours=12)
-
-pwd_ctx     = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-
-def _hash(pw: str) -> str:
-    return pwd_ctx.hash(pw)
-
-
-def _verify(pw: str, hashed: str) -> bool:
-    return pwd_ctx.verify(pw, hashed)
-
-
-def _make_token(user_id: str) -> str:
-    exp = datetime.now(timezone.utc) + TOKEN_TTL
-    return jwt.encode({"sub": user_id, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
+bearer_scheme = HTTPBearer()
 
 
 def _generate_referral_code(db: Session) -> str:
@@ -47,7 +34,7 @@ def _generate_referral_code(db: Session) -> str:
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    creds: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     cred_exc = HTTPException(
@@ -56,58 +43,73 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if not user_id:
-            raise cred_exc
-    except JWTError:
+        decoded = verify_id_token(creds.credentials)
+    except Exception:
         raise cred_exc
-    user = db.get(User, user_id)
+
+    uid = decoded.get("uid")
+    if not uid:
+        raise cred_exc
+
+    user = db.get(User, uid)
     if not user:
-        raise cred_exc
+        email = decoded.get("email") or f"{uid}@firebase.local"
+        user = User(
+            id=uid,
+            email=email,
+            display_name=decoded.get("name") or email.split("@")[0],
+            role="both",
+            referral_code=_generate_referral_code(db),
+        )
+        db.add(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            # Another concurrent request for this same brand-new uid (e.g.
+            # several components firing right after signup) already won the
+            # insert race — roll back this one and use the row it created.
+            db.rollback()
+            user = db.get(User, uid)
+            if not user:
+                raise cred_exc
     return user
 
 
-@router.post("/register", response_model=TokenResponse)
-def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == req.email).first():
-        raise HTTPException(status_code=409, detail="Email already registered")
-    if req.role not in ("provider", "seeker", "both"):
-        raise HTTPException(status_code=422, detail="role must be provider, seeker, or both")
-    referrer = None
-    if req.referral_code:
-        referrer = db.query(User).filter(User.referral_code == req.referral_code.strip().upper()).first()
+@router.post("/register", response_model=UserOut)
+def complete_profile(
+    req: ProfileSyncRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Called once by the frontend right after Firebase account creation, to set
+    the application-level profile fields Firebase doesn't track. Safe to
+    call again (idempotent) — it just updates display_name/role — but the
+    referral link is only ever attached once, on this user's first call.
+    """
+    current_user.display_name = req.display_name
+    if req.role in ("provider", "seeker", "both"):
+        current_user.role = req.role
 
-    user = User(
-        id=str(uuid.uuid4()),
-        email=req.email,
-        hashed_pw=_hash(req.password),
-        display_name=req.display_name,
-        role=req.role,
-        referral_code=_generate_referral_code(db),
-        referred_by=referrer.id if referrer else None,
-    )
-    db.add(user)
-    db.flush()  # user.id needed for the Referral FK before commit
-
-    if referrer:
-        db.add(Referral(
-            id=str(uuid.uuid4()),
-            referrer_id=referrer.id,
-            referred_id=user.id,
-            credited=False,
-        ))
+    if req.referral_code and not current_user.referred_by:
+        referrer = (
+            db.query(User)
+            .filter(User.referral_code == req.referral_code.strip().upper())
+            .first()
+        )
+        if referrer and referrer.id != current_user.id:
+            current_user.referred_by = referrer.id
+            db.add(Referral(
+                id=str(uuid.uuid4()),
+                referrer_id=referrer.id,
+                referred_id=current_user.id,
+                credited=False,
+            ))
 
     db.commit()
-    return TokenResponse(access_token=_make_token(user.id))
-
-
-@router.post("/login", response_model=TokenResponse)
-def login(req: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email).first()
-    if not user or not _verify(req.password, user.hashed_pw):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    return TokenResponse(access_token=_make_token(user.id))
+    db.refresh(current_user)
+    return current_user
 
 
 @router.get("/me", response_model=UserOut)

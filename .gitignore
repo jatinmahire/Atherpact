@@ -26,6 +26,13 @@ backend/server_pid.txt
 frontend/node_modules/
 frontend/dist/
 
+# Secrets (Addendum 4) — Firebase service account key, Razorpay keys, etc.
+# Never committed; each developer supplies their own locally.
+backend/.env
+backend/secrets/
+frontend/.env
+frontend/.env.local
+
 # OS/editor
 .DS_Store
 .vscode/

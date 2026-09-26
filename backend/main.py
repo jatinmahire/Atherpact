@@ -7,6 +7,9 @@ sentence-transformer model at startup so the first /match call is instant.
 import logging
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+load_dotenv()  # Phase 37/38 (Addendum 4): FIREBASE_*/RAZORPAY_* secrets, before any router imports them
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -27,6 +30,17 @@ async def lifespan(app: FastAPI):
     logger.info("Seeding demo data…")
     with SessionLocal() as db:
         seed_database(db)
+
+    logger.info("Provisioning real Firebase accounts for demo users…")
+    from services.firebase_service import provision_seed_accounts
+    try:
+        provision_seed_accounts()
+    except Exception as e:
+        logger.error(
+            f"Could not provision Firebase seed accounts ({e}). Auth will fail "
+            "until FIREBASE_SERVICE_ACCOUNT_PATH points to a valid key — see "
+            "Addendum 4, Phase 37's manual setup step."
+        )
 
     logger.info("Pre-loading sentence-transformer (all-MiniLM-L6-v2)…")
     from services.matcher import get_model

@@ -10,6 +10,8 @@ import json
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
+from test_firebase_helper import firebase_id_token
+
 BASE = 'http://localhost:8000'
 
 # 1. Health check
@@ -25,20 +27,9 @@ for l in listings[:2]:
     print(f'   - {l["title"]} (Rs {l["price_per_day"]}/day)')
 assert len(listings) >= 5
 
-# 3. Register a test user
-r = requests.post(f'{BASE}/auth/register', json={
-    'email': 'testseeker@demo.com',
-    'password': 'Test123!',
-    'display_name': 'Test Seeker',
-    'role': 'both'
-})
-if r.status_code == 409:
-    r = requests.post(f'{BASE}/auth/login', json={
-        'email': 'testseeker@demo.com',
-        'password': 'Test123!'
-    })
-token = r.json().get('access_token')
-print(f'3. Register/Login: token={token[:20]}...')
+# 3. Sign in as the seeded demo seeker (real Firebase Auth, Phase 37)
+token = firebase_id_token('testseeker@demo.com', 'Test123!')
+print(f'3. Firebase sign-in: token={token[:20]}...')
 assert token
 
 headers = {'Authorization': f'Bearer {token}'}

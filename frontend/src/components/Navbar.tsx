@@ -21,7 +21,13 @@ export default function Navbar() {
   const nav = useNavigate()
   const [user, setUser] = useState(authStore.getUser())
 
-  useEffect(() => authStore.subscribe(() => setUser(authStore.getUser())), [])
+  useEffect(() => {
+    // Re-sync immediately — the store can change in the gap between this
+    // component's initial render and this effect subscribing (e.g. a
+    // just-completed sign-in), which subscribe() alone would miss forever.
+    setUser(authStore.getUser())
+    return authStore.subscribe(() => setUser(authStore.getUser()))
+  }, [])
 
   return (
     <nav className="flex items-center justify-between px-4 py-4 max-w-6xl mx-auto border-b border-lavender/20 bg-white/80 backdrop-blur sticky top-0 z-10">

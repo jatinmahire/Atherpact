@@ -107,11 +107,19 @@ export default function AuditPage() {
   const [cameraError, setCameraError] = useState('')
 
   useEffect(() => {
-    if (!authStore.getToken()) { nav('/login'); return }
-    bookingsAPI.list()
-      .then((res) => setBookings(res.data))
-      .catch(() => setError('Could not load bookings'))
-      .finally(() => setLoadingBookings(false))
+    // Phase 37 (Addendum 4): wait for Firebase to report the session at
+    // least once before deciding to redirect — otherwise a real session
+    // briefly looks logged-out during the async restore.
+    const check = () => {
+      if (!authStore.isReady()) return
+      if (!authStore.isAuthenticated()) { nav('/login'); return }
+      bookingsAPI.list()
+        .then((res) => setBookings(res.data))
+        .catch(() => setError('Could not load bookings'))
+        .finally(() => setLoadingBookings(false))
+    }
+    check()
+    return authStore.subscribe(check)
   }, [])
 
   useEffect(() => {

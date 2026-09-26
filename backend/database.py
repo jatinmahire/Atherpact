@@ -39,9 +39,12 @@ Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
-    id            = Column(String, primary_key=True)       # UUID
+    # Phase 37 (Addendum 4): id is now the Firebase uid — Firebase Auth owns
+    # account creation and password verification entirely; this row only
+    # holds the application-level profile Firebase itself doesn't track.
+    id            = Column(String, primary_key=True)
     email         = Column(String, unique=True, nullable=False)
-    hashed_pw     = Column(String, nullable=False)
+    hashed_pw     = Column(String, nullable=True)  # vestigial post-Firebase-migration, unused
     display_name  = Column(String, nullable=False)
     role          = Column(String, nullable=False)          # "provider" | "seeker" | "both"
     # Phase 15 (Addendum 2): set only by a real verification_connector call once
@@ -267,11 +270,16 @@ class Referral(Base):
 
 SEED_PROVIDER_ID   = "seed-provider-001"
 SEED_PROVIDER_EMAIL = "seedprovider@aetherpact.demo"
+SEED_PROVIDER_PASSWORD = "SeedPass123!"
 
-
-def _hash(pw: str) -> str:
-    from passlib.context import CryptContext
-    return CryptContext(schemes=["bcrypt"], deprecated="auto").hash(pw)
+# Phase 37 (Addendum 4): previously created ad hoc by whichever test script
+# ran first via the old /auth/register endpoint. Now that account creation
+# is Firebase's job, this demo seeker is seeded explicitly here (both the DB
+# row below and the matching real Firebase account in main.py's startup)
+# so the documented demo credentials keep working.
+SEED_SEEKER_ID = "seed-seeker-001"
+SEED_SEEKER_EMAIL = "testseeker@demo.com"
+SEED_SEEKER_PASSWORD = "Test123!"
 
 
 SEED_ASSETS = [
@@ -359,17 +367,28 @@ SEED_ASSETS = [
 
 
 def seed_database(db: Session) -> None:
-    """Insert seed users and assets if they don't already exist."""
+    """Insert seed users and assets if they don't already exist. Password
+    hashing is gone (Phase 37, Addendum 4) — Firebase owns that now; see
+    services.firebase_service.provision_seed_accounts for the matching
+    real Firebase accounts, called separately at startup."""
     # Seed provider user first, commit so FK is satisfied
     if not db.get(User, SEED_PROVIDER_ID):
         db.add(User(
             id=SEED_PROVIDER_ID,
             email=SEED_PROVIDER_EMAIL,
-            hashed_pw=_hash("SeedPass123!"),
             display_name="AetherPact Demo Provider",
             role="provider",
         ))
         db.commit()  # commit user before assets
+
+    if not db.get(User, SEED_SEEKER_ID):
+        db.add(User(
+            id=SEED_SEEKER_ID,
+            email=SEED_SEEKER_EMAIL,
+            display_name="Test Seeker",
+            role="both",
+        ))
+        db.commit()
 
     # Seed assets (FK references user above)
     for data in SEED_ASSETS:

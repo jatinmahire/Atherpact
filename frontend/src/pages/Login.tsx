@@ -6,8 +6,22 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
-import { authAPI } from '../api/client'
-import { authStore } from '../store/auth'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '../lib/firebase'
+
+// Phase 37 (Addendum 4): Firebase's own error codes, translated into the
+// same plain-language message the old backend-side check used to give —
+// never expose "auth/wrong-password" etc. directly to the user.
+function firebaseErrorMessage(err: any): string {
+  const code = err?.code ?? ''
+  if (code.includes('user-not-found') || code.includes('wrong-password') || code.includes('invalid-credential')) {
+    return 'Login failed. Check your credentials.'
+  }
+  if (code.includes('too-many-requests')) {
+    return 'Too many attempts — please wait a moment and try again.'
+  }
+  return 'Login failed. Check your credentials.'
+}
 
 export default function Login() {
   const nav  = useNavigate()
@@ -21,12 +35,10 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      const res = await authAPI.login(email, password)
-      authStore.setToken(res.data.access_token)
-      await authStore.restoreSession()
+      await signInWithEmailAndPassword(auth, email, password)
       nav('/')
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Login failed. Check your credentials.')
+      setError(firebaseErrorMessage(err))
     } finally {
       setLoading(false)
     }

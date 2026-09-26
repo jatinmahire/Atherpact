@@ -6,8 +6,20 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '../lib/firebase'
 import { authAPI } from '../api/client'
 import { authStore } from '../store/auth'
+
+// Phase 37 (Addendum 4): Firebase's own error codes, translated into plain
+// language — never expose "auth/email-already-in-use" directly.
+function firebaseErrorMessage(err: any): string {
+  const code = err?.code ?? ''
+  if (code.includes('email-already-in-use')) return 'That email is already registered — try signing in instead.'
+  if (code.includes('weak-password')) return 'Password must be at least 6 characters.'
+  if (code.includes('invalid-email')) return 'Please enter a valid email address.'
+  return 'Registration failed.'
+}
 
 export default function Register() {
   const nav = useNavigate()
@@ -27,15 +39,20 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      const res = await authAPI.register(
-        form.email, form.password, form.display_name, form.role,
-        form.referral_code.trim() || undefined,
-      )
-      authStore.setToken(res.data.access_token)
-      await authStore.restoreSession()
+      // Firebase creates the real account; our backend only records the
+      // application-level profile (display_name/role/referral) right after,
+      // authenticated with the Firebase ID token this just produced.
+      await createUserWithEmailAndPassword(auth, form.email, form.password)
+      const res = await authAPI.register(form.display_name, form.role, form.referral_code.trim() || undefined)
+      // authStore's own onAuthStateChanged listener also fires from the
+      // signup above and calls GET /auth/me independently — that race can
+      // land before this profile-sync finishes and cache the stale,
+      // email-derived default display_name. Set the fresh result directly
+      // rather than trusting whichever call happens to resolve last.
+      authStore.setUser(res.data)
       nav('/')
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Registration failed.')
+      setError(err?.response?.data?.detail ?? firebaseErrorMessage(err))
     } finally {
       setLoading(false)
     }

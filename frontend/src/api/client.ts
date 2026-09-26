@@ -4,16 +4,20 @@
  */
 
 import axios from 'axios'
+import { auth } from '../lib/firebase'
 
 export const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Attach JWT token to every request if present
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('aetherpact_token')
-  if (token) {
+// Phase 37 (Addendum 4): attach a real, current Firebase ID token to every
+// request. getIdToken() also transparently refreshes an expired token, so
+// no manual refresh logic is needed here.
+api.interceptors.request.use(async (config) => {
+  const user = auth.currentUser
+  if (user) {
+    const token = await user.getIdToken()
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
@@ -124,11 +128,12 @@ export interface ChatResponse {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const authAPI = {
-  register: (email: string, password: string, display_name: string, role: string, referral_code?: string) =>
-    api.post<{ access_token: string }>('/auth/register', { email, password, display_name, role, referral_code }),
-
-  login: (email: string, password: string) =>
-    api.post<{ access_token: string }>('/auth/login', { email, password }),
+  // Phase 37 (Addendum 4): Firebase itself now creates the account (see
+  // Register.tsx) — this call only completes the application-level profile
+  // (display_name/role/referral) that Firebase doesn't track, for the
+  // already-authenticated Firebase user making the request.
+  register: (display_name: string, role: string, referral_code?: string) =>
+    api.post<User>('/auth/register', { display_name, role, referral_code }),
 
   me: () => api.get<User>('/auth/me'),
 

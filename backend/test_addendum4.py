@@ -19,16 +19,18 @@ import sys, uuid
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 import requests
+from test_firebase_helper import firebase_id_token
 
 BASE = 'http://127.0.0.1:8000'
 
 
 def register(email):
-    r = requests.post(f'{BASE}/auth/register', json={
-        'email': email, 'password': 'Test123!', 'display_name': 'Verify', 'role': 'both',
-    })
+    """Real Firebase account (Phase 37) + our app-level profile-sync call."""
+    token = firebase_id_token(email, 'Test123!')
+    r = requests.post(f'{BASE}/auth/register', json={'display_name': 'Verify', 'role': 'both'},
+                       headers={'Authorization': f'Bearer {token}'})
     r.raise_for_status()
-    return r.json()['access_token']
+    return token
 
 
 token = register(f'phase36-{uuid.uuid4().hex[:6]}@test.com')
@@ -107,6 +109,43 @@ if target_unresolved:
 else:
     print("[Phase 36] Unresolved listing not in top-5 this run (ranked out by semantic/price) — skipped, not a failure")
 
+# ── Phase 37: Firebase Auth Migration ────────────────────────────────────
+# 9. Missing token -> rejected
+r9 = requests.get(f'{BASE}/auth/me')
+assert r9.status_code in (401, 403)
+print(f"[Phase 37] Missing token rejected (status {r9.status_code}) — PASS")
+
+# 10. Invalid/garbage token -> rejected
+r10 = requests.get(f'{BASE}/auth/me', headers={'Authorization': 'Bearer not-a-real-token'})
+assert r10.status_code == 401
+print("[Phase 37] Invalid token rejected (401) — PASS")
+
+# 11. A brand-new Firebase user auto-upserts a DB row on first request
+new_email = f'phase37-new-{uuid.uuid4().hex[:6]}@test.com'
+new_token = firebase_id_token(new_email, 'Test123!')
+r11 = requests.get(f'{BASE}/auth/me', headers={'Authorization': f'Bearer {new_token}'})
+assert r11.status_code == 200
+new_user = r11.json()
+assert new_user['email'] == new_email
+assert new_user['role'] == 'both'  # default before profile-sync
+print("[Phase 37] Brand-new Firebase uid auto-upserts a user row on first request — PASS")
+
+# 12. Profile-sync sets display_name/role and preserves them on GET /me
+r12 = requests.post(f'{BASE}/auth/register', json={'display_name': 'Phase 37 Tester', 'role': 'provider'},
+                     headers={'Authorization': f'Bearer {new_token}'})
+assert r12.status_code == 200
+r12b = requests.get(f'{BASE}/auth/me', headers={'Authorization': f'Bearer {new_token}'})
+assert r12b.json()['display_name'] == 'Phase 37 Tester'
+assert r12b.json()['role'] == 'provider'
+print("[Phase 37] Profile-sync (display_name/role) persists — PASS")
+
+# 13. Seed demo credentials still work through real Firebase (documented demo login)
+seed_token = firebase_id_token('seedprovider@aetherpact.demo', 'SeedPass123!')
+seed_me = requests.get(f'{BASE}/auth/me', headers={'Authorization': f'Bearer {seed_token}'}).json()
+assert seed_me['id'] == 'seed-provider-001'
+assert seed_me['role'] == 'provider'
+print("[Phase 37] Documented demo credentials (seedprovider@aetherpact.demo) still work — PASS")
+
 print("\n" + "=" * 60)
-print("ADDENDUM 4 REGRESSION SUITE (PHASE 36): ALL CHECKS PASSED")
+print("ADDENDUM 4 REGRESSION SUITE (PHASES 36-37): ALL CHECKS PASSED")
 print("=" * 60)
