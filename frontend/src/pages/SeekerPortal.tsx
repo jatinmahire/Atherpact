@@ -26,6 +26,7 @@ const CATEGORY_LABELS: Record<string, string> = {
  * since no search query has been run. Never fabricates a score to fill
  * this in; that's what MatchCard (used once a real search runs) is for. */
 function ListingBrowseCard({ listing, rank, onNegotiate }: { listing: Listing; rank: number; onNegotiate?: () => void }) {
+  const nav = useNavigate()
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -37,7 +38,10 @@ function ListingBrowseCard({ listing, rank, onNegotiate }: { listing: Listing; r
           <span className="text-xs px-2 py-0.5 rounded-full bg-lavender/30 text-navy font-medium">
             {CATEGORY_LABELS[listing.category] ?? listing.category}
           </span>
-          <h3 className="font-semibold text-gray-900 text-lg leading-tight mt-1">{listing.title}</h3>
+          <h3 className="font-semibold text-gray-900 text-lg leading-tight mt-1 cursor-pointer hover:text-navy transition-colors"
+            onClick={() => nav(`/listing/${listing.id}`)}>
+            {listing.title}
+          </h3>
           <p className="text-gray-500 text-sm mt-1 flex items-center gap-1">
             <MapPin size={12} /> {listing.address}
           </p>
@@ -63,6 +67,8 @@ function ListingBrowseCard({ listing, rank, onNegotiate }: { listing: Listing; r
   )
 }
 
+type SortOption = 'best_match' | 'price_asc' | 'price_desc'
+
 export default function SeekerPortal() {
   const nav  = useNavigate()
   const user = authStore.getUser()
@@ -75,6 +81,16 @@ export default function SeekerPortal() {
   const [error, setError]       = useState('')
   const [negotiating, setNegotiating] = useState<MatchResultItem | null>(null)
 
+  // Real, backend-backed filters only (Phase 22, Addendum 3): category maps
+  // to GET /listings?category= server-side; capacity/sort are real client-
+  // side operations over the real returned fields. No location-text geocode
+  // or rating filter here — /match doesn't return per-listing rating or
+  // accept a location string today, and fabricating that UI would violate
+  // "the frontend never computes/invents a score."
+  const [category, setCategory] = useState('')
+  const [minCapacity, setMinCapacity] = useState('')
+  const [sort, setSort] = useState<SortOption>('best_match')
+
   // Default "browse all" view — every active listing, newest first, shown
   // until a real search is run. Without this, a page titled "Browse
   // Available Resources" showed nothing at all (including newly created
@@ -83,11 +99,12 @@ export default function SeekerPortal() {
   const [loadingAll, setLoadingAll]   = useState(true)
 
   useEffect(() => {
-    listingsAPI.list()
+    setLoadingAll(true)
+    listingsAPI.list(category || undefined)
       .then((res) => setAllListings(res.data))
       .catch(() => {})
       .finally(() => setLoadingAll(false))
-  }, [])
+  }, [category])
 
   const search = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,6 +121,16 @@ export default function SeekerPortal() {
       setLoading(false)
     }
   }
+
+  const cap = minCapacity ? parseInt(minCapacity) : 0
+  const visibleListings = allListings.filter((l) => !cap || (l.capacity ?? 0) >= cap)
+  const visibleResults = results
+    .filter((r) => (!category || r.asset.category === category) && (!cap || (r.asset.capacity ?? 0) >= cap))
+    .sort((a, b) => {
+      if (sort === 'price_asc') return a.asset.price_per_day - b.asset.price_per_day
+      if (sort === 'price_desc') return b.asset.price_per_day - a.asset.price_per_day
+      return b.scores.final_score - a.scores.final_score
+    })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-lavender/10">
@@ -128,17 +155,17 @@ export default function SeekerPortal() {
         </div>
       </nav>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-8">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Find Resources</h1>
-          <p className="text-gray-500 mb-8">
+          <p className="text-gray-500 mb-6">
             Semantic search powered by <code className="bg-gray-100 px-1 rounded text-xs">all-MiniLM-L6-v2</code>.
             Scores are computed live — never hardcoded.
           </p>
         </motion.div>
 
         {/* Search form */}
-        <form onSubmit={search} className="bg-white rounded-2xl shadow-sm border border-lavender/20 p-5 mb-8">
+        <form onSubmit={search} className="bg-white rounded-2xl shadow-sm border border-lavender/20 p-5 mb-6">
           <div className="flex gap-3">
             <div className="flex-1">
               <input
@@ -165,68 +192,108 @@ export default function SeekerPortal() {
           </div>
         </form>
 
-        {/* Browse-all view — shown until a real search is run, so newly
-            uploaded/updated listings are visible immediately, latest first */}
-        {!searched && (
-          loadingAll ? (
-            <SkeletonList count={3} />
-          ) : allListings.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
-              <Search size={40} className="mx-auto mb-3 opacity-40" />
-              <p>No resources listed yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-400">
-                All {allListings.length} listed resources · newest first — search above to rank by fit
-              </p>
-              {allListings.map((listing, i) => (
-                <ListingBrowseCard
-                  key={listing.id}
-                  listing={listing}
-                  rank={i}
-                  onNegotiate={user ? () => setNegotiating({
-                    asset: listing,
-                    scores: { semantic_score: 0, price_score: 0, distance_score: 0, final_score: 0 },
-                  }) : undefined}
-                />
-              ))}
-            </div>
-          )
-        )}
-
-        {/* Search results */}
-        {loading && <SkeletonList count={3} />}
-
-        {!loading && error && (
-          <div className="text-red-600 bg-red-50 rounded-xl px-4 py-3 text-sm">{error}</div>
-        )}
-
-        {!loading && searched && !error && (
-          <AnimatePresence>
-            {results.length === 0 ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="text-center py-16 text-gray-400">
-                <Search size={40} className="mx-auto mb-3 opacity-40" />
-                <p>No matching resources found. Try a different query.</p>
-              </motion.div>
-            ) : (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                <p className="text-sm text-gray-400">
-                  Top {results.length} matches · sorted by final score
-                </p>
-                {results.map((item, i) => (
-                  <MatchCard
-                    key={item.asset.id}
-                    item={item}
-                    rank={i}
-                    onNegotiate={user ? setNegotiating : undefined}
-                  />
+        <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
+          {/* Real, backend-backed filters — category maps to GET /listings?category=,
+              capacity/sort are real client-side operations over real returned fields */}
+          <aside className="bg-white rounded-2xl border border-lavender/20 shadow-sm p-4 h-fit space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Resource Type</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-navy">
+                <option value="">All types</option>
+                {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
                 ))}
-              </motion.div>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Min. Capacity</label>
+              <input type="number" value={minCapacity} onChange={(e) => setMinCapacity(e.target.value)}
+                placeholder="Any"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-navy" />
+            </div>
+            {searched && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sort</label>
+                <select value={sort} onChange={(e) => setSort(e.target.value as SortOption)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-navy">
+                  <option value="best_match">Best Match</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                </select>
+              </div>
             )}
-          </AnimatePresence>
-        )}
+          </aside>
+
+          <div>
+            {/* Browse-all view — shown until a real search is run, so newly
+                uploaded/updated listings are visible immediately, latest first */}
+            {!searched && (
+              loadingAll ? (
+                <SkeletonList count={3} />
+              ) : visibleListings.length === 0 ? (
+                <div className="text-center py-16 text-gray-400">
+                  <Search size={40} className="mx-auto mb-3 opacity-40" />
+                  <p>No resources match these filters.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-400">
+                    {visibleListings.length} listed resources · newest first — search above to rank by fit
+                  </p>
+                  {visibleListings.map((listing, i) => (
+                    <ListingBrowseCard
+                      key={listing.id}
+                      listing={listing}
+                      rank={i}
+                      onNegotiate={user ? () => setNegotiating({
+                        asset: listing,
+                        scores: { semantic_score: 0, price_score: 0, distance_score: 0, final_score: 0 },
+                      }) : undefined}
+                    />
+                  ))}
+                </div>
+              )
+            )}
+
+            {/* Search results */}
+            {loading && <SkeletonList count={3} />}
+
+            {!loading && error && (
+              <div className="text-red-600 bg-red-50 rounded-xl px-4 py-3 text-sm">{error}</div>
+            )}
+
+            {!loading && searched && !error && (
+              <AnimatePresence>
+                {visibleResults.length === 0 ? (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    className="text-center py-16 text-gray-400">
+                    <Search size={40} className="mx-auto mb-3 opacity-40" />
+                    <p>No matching resources found.</p>
+                    <ul className="text-xs text-gray-400 mt-2 space-y-0.5">
+                      <li>Try a different query or increase your budget</li>
+                      <li>Clear the resource type or capacity filter</li>
+                    </ul>
+                  </motion.div>
+                ) : (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                    <p className="text-sm text-gray-400">
+                      {visibleResults.length} matches · sorted by {sort === 'best_match' ? 'final score' : 'price'}
+                    </p>
+                    {visibleResults.map((item, i) => (
+                      <MatchCard
+                        key={item.asset.id}
+                        item={item}
+                        rank={i}
+                        onNegotiate={user ? setNegotiating : undefined}
+                      />
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+          </div>
+        </div>
       </main>
 
       {/* Negotiate modal */}

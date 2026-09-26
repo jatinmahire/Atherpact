@@ -194,6 +194,20 @@ class DecisionFlag(Base):
     created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class ContactMessage(Base):
+    """Phase 21 (Addendum 3): real storage for the /contact page submission —
+    no fake 'success' toast without an actual row being written."""
+    __tablename__ = "contact_messages"
+    id          = Column(String, primary_key=True)
+    name        = Column(String, nullable=False)
+    business    = Column(String, nullable=True)
+    email       = Column(String, nullable=False)
+    phone       = Column(String, nullable=True)
+    category    = Column(String, nullable=False)  # general|booking|negotiation|verification|technical
+    message     = Column(Text, nullable=False)
+    created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Seed Data (5 realistic Mumbai-area hospitality assets)
 # ─────────────────────────────────────────────────────────────────────────────

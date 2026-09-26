@@ -240,3 +240,19 @@ class ProviderAnalyticsOut(BaseModel):
     completed_bookings: int
     average_rating: Optional[float]
     total_reviews: int
+
+
+# ── Contact (Phase 21, Addendum 3) ──────────────────────────────────────────────
+
+class ContactMessageCreate(BaseModel):
+    name: str
+    business: Optional[str] = None
+    email: EmailStr
+    phone: Optional[str] = None
+    category: str = Field(pattern=r"^(general|booking|negotiation|verification|technical)$")
+    message: str = Field(min_length=1)
+
+
+class ContactMessageOut(BaseModel):
+    id: str
+    created_at: datetime

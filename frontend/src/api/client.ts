@@ -285,3 +285,18 @@ export const analyticsAPI = {
 export const systemAPI = {
   health: () => api.get<{ status: string; project: string }>('/health'),
 }
+
+// ─── Contact ─────────────────────────────────────────────────────────────────
+
+export interface ContactMessagePayload {
+  name: string
+  business?: string
+  email: string
+  phone?: string
+  category: 'general' | 'booking' | 'negotiation' | 'verification' | 'technical'
+  message: string
+}
+
+export const contactAPI = {
+  send: (payload: ContactMessagePayload) => api.post<{ id: string; created_at: string }>('/contact', payload),
+}

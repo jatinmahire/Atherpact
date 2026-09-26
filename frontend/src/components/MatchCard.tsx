@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, MapPin, Cpu } from 'lucide-react'
 import type { MatchResultItem } from '../api/client'
@@ -45,6 +46,7 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
 
 export default function MatchCard({ item, rank, onNegotiate }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const nav = useNavigate()
   const { asset, scores } = item
 
   const badgeColor =
@@ -69,7 +71,10 @@ export default function MatchCard({ item, rank, onNegotiate }: Props) {
                 {CATEGORY_LABELS[asset.category] ?? asset.category}
               </span>
             </div>
-            <h3 className="font-semibold text-gray-900 text-lg leading-tight">{asset.title}</h3>
+            <h3 className="font-semibold text-gray-900 text-lg leading-tight cursor-pointer hover:text-navy transition-colors"
+              onClick={() => nav(`/listing/${asset.id}`, { state: { matchItem: item } })}>
+              {asset.title}
+            </h3>
             <p className="text-gray-500 text-sm mt-1 flex items-center gap-1">
               <MapPin size={12} /> {asset.address}
             </p>

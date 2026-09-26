@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from database import create_tables, SessionLocal, seed_database
-from routers import auth, listings, match, negotiate, laya_router, audit, bookings, reviews, analytics
+from routers import auth, listings, match, negotiate, laya_router, audit, bookings, reviews, analytics, contact
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aetherpact")
@@ -73,6 +73,7 @@ app.include_router(audit.router)
 app.include_router(bookings.router)
 app.include_router(reviews.router)
 app.include_router(analytics.router)
+app.include_router(contact.router)
 
 # Serve uploaded audit images so the frontend can display them
 from pathlib import Path
