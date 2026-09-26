@@ -19,6 +19,7 @@ from models import (
 from routers.auth import get_current_user
 from database import User
 from services import vector_index
+from services.location_resolver import resolve_location
 
 
 def _rebuild_vector_index(db: Session) -> None:
@@ -54,6 +55,12 @@ def create_listing(
     """Create a new resource listing. Owner is the authenticated user."""
     if current_user.role not in ("provider", "both"):
         raise HTTPException(status_code=403, detail="Only providers can create listings")
+
+    # Phase 36 (Addendum 4): never trust raw-typed lat/lon — resolve from a
+    # pasted Google Maps link or browser-geolocation coordinates. An
+    # unresolvable link never blocks the save; it just leaves lat/lon null.
+    location = resolve_location(lat=req.lat, lon=req.lon, maps_link=req.maps_link)
+
     asset = Asset(
         id=str(uuid.uuid4()),
         owner_id=current_user.id,
@@ -61,8 +68,9 @@ def create_listing(
         description=req.description,
         category=req.category,
         price_per_day=req.price_per_day,
-        lat=req.lat,
-        lon=req.lon,
+        lat=location["lat"],
+        lon=location["lon"],
+        maps_link=location["maps_link"],
         address=req.address,
         capacity=req.capacity,
         is_active=True,

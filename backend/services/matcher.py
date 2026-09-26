@@ -74,16 +74,19 @@ _DISTANCE_DECAY_KM = 10.0
 def _distance_score(
     req_lat: Optional[float],
     req_lon: Optional[float],
-    asset_lat: float,
-    asset_lon: float,
+    asset_lat: Optional[float],
+    asset_lon: Optional[float],
 ) -> float:
     """
     Phase 10 fix: exponential decay instead of a hard linear cutoff — a listing
     12-15 km out (common for peri-urban kitchens/AV depots) now gets a small
     nonzero score instead of being zeroed out entirely past 10 km.
-    Returns 0.5 if coords absent.
+
+    Phase 36 (Addendum 4): a listing's own lat/lon can now also be absent
+    (its maps link never resolved) — same neutral 0.5 fallback applies,
+    matching the "Location pending" UI rather than crashing or scoring zero.
     """
-    if req_lat is None or req_lon is None:
+    if req_lat is None or req_lon is None or asset_lat is None or asset_lon is None:
         return 0.5
     km = _haversine_km(req_lat, req_lon, asset_lat, asset_lon)
     return math.exp(-km / _DISTANCE_DECAY_KM)
@@ -108,8 +111,8 @@ def score_listing(
     query_embedding: np.ndarray,
     listing_description: str,
     listing_price: float,
-    listing_lat: float,
-    listing_lon: float,
+    listing_lat: Optional[float],
+    listing_lon: Optional[float],
     budget: float,
     req_lat: Optional[float],
     req_lon: Optional[float],

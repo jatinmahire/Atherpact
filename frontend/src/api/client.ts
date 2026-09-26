@@ -39,13 +39,26 @@ export interface Listing {
   description: string
   category: string
   price_per_day: number
-  lat: number
-  lon: number
+  lat: number | null
+  lon: number | null
+  maps_link: string | null
   address: string
   capacity: number | null
   is_active: boolean
   created_at: string
   owner_verified: boolean
+}
+
+export interface ListingCreatePayload {
+  title: string
+  description: string
+  category: string
+  price_per_day: number
+  address: string
+  capacity: number | null
+  lat?: number
+  lon?: number
+  maps_link?: string
 }
 
 export interface ReferralStatus {
@@ -138,7 +151,7 @@ export const listingsAPI = {
   list: (category?: string) =>
     api.get<Listing[]>('/listings', { params: category ? { category } : {} }),
 
-  create: (data: Omit<Listing, 'id' | 'owner_id' | 'is_active' | 'created_at'>) =>
+  create: (data: ListingCreatePayload) =>
     api.post<Listing>('/listings', data),
 
   get: (id: string) => api.get<Listing>(`/listings/${id}`),

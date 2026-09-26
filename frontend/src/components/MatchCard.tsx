@@ -141,7 +141,14 @@ export default function MatchCard({ item, rank, onNegotiate }: Props) {
               </p>
               <ScoreBar label="Semantic Relevance" value={scores.semantic_score} color="#3A4876" />
               <ScoreBar label="Price Match"        value={scores.price_score}    color="#C7CEEA" />
-              <ScoreBar label="Location Proximity" value={scores.distance_score} color="#6c75a8" />
+              {asset.lat == null || asset.lon == null ? (
+                <div className="mb-2 flex justify-between text-xs text-gray-400">
+                  <span>Location Proximity</span>
+                  <span className="italic">Location pending</span>
+                </div>
+              ) : (
+                <ScoreBar label="Location Proximity" value={scores.distance_score} color="#6c75a8" />
+              )}
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <ScoreBar label="Overall Score (0.5·sem + 0.3·price + 0.2·dist)" value={scores.final_score} color="#2a3560" />
               </div>

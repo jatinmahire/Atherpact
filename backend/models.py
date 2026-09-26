@@ -49,10 +49,15 @@ class ListingCreate(BaseModel):
     description: str
     category: str
     price_per_day: float = Field(gt=0)
-    lat: float
-    lon: float
     address: str
     capacity: Optional[int] = None
+    # Phase 36 (Addendum 4): never raw-typed. Either browser geolocation
+    # (lat/lon, no maps_link) or a pasted Google Maps link (maps_link takes
+    # priority if both are present) — resolved server-side. Both optional:
+    # an unresolvable/absent location still saves, showing "Location pending".
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    maps_link: Optional[str] = None
 
 
 class ListingOut(BaseModel):
@@ -62,8 +67,9 @@ class ListingOut(BaseModel):
     description: str
     category: str
     price_per_day: float
-    lat: float
-    lon: float
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    maps_link: Optional[str] = None
     address: str
     capacity: Optional[int]
     is_active: bool

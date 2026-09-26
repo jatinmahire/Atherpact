@@ -93,7 +93,15 @@ export default function ListingDetail() {
               </span>
             )}
           </div>
-          <p className="text-gray-500 text-sm flex items-center gap-1 mb-4"><MapPin size={13} /> {listing.address}</p>
+          <p className="text-gray-500 text-sm flex items-center gap-1 mb-4">
+            <MapPin size={13} /> {listing.address}
+            {listing.maps_link && (
+              <a href={listing.maps_link} target="_blank" rel="noopener noreferrer"
+                className="text-navy font-medium hover:underline ml-1">
+                View on Google Maps
+              </a>
+            )}
+          </p>
 
           {reviews && reviews.total_reviews > 0 && (
             <div className="flex items-center gap-1.5 mb-4 text-sm">
@@ -127,7 +135,12 @@ export default function ListingDetail() {
               <div className="grid grid-cols-3 gap-3 text-center text-xs">
                 <div><div className="font-bold text-gray-900">{(matchScores.semantic_score * 100).toFixed(0)}%</div>Semantic</div>
                 <div><div className="font-bold text-gray-900">{(matchScores.price_score * 100).toFixed(0)}%</div>Price Fit</div>
-                <div><div className="font-bold text-gray-900">{(matchScores.distance_score * 100).toFixed(0)}%</div>Distance</div>
+                <div>
+                  {listing.lat == null || listing.lon == null
+                    ? <div className="font-bold text-gray-400 italic text-[11px] leading-tight">Location<br />pending</div>
+                    : <div className="font-bold text-gray-900">{(matchScores.distance_score * 100).toFixed(0)}%</div>}
+                  Distance
+                </div>
               </div>
             </div>
           )}

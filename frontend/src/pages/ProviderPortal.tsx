@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown, Star, CalendarCheck, Gift, Copy } from 'lucide-react'
+import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown, Star, CalendarCheck, Gift, Copy, LocateFixed } from 'lucide-react'
 import { listingsAPI, analyticsAPI, authAPI } from '../api/client'
 import type { Listing, RecurringAvailabilityRule, ProviderAnalytics, ReferralStatus } from '../api/client'
 import { authStore } from '../store/auth'
@@ -143,9 +143,25 @@ export default function ProviderPortal() {
 
   const [form, setForm] = useState({
     title: '', description: '', category: 'banquet_hall',
-    price_per_day: '', lat: '19.0760', lon: '72.8777',
-    address: '', capacity: '',
+    price_per_day: '', address: '', capacity: '', maps_link: '',
   })
+  // Phase 36 (Addendum 4): coordinates are never raw-typed — only captured
+  // via the browser's own geolocation, kept out of the visible form entirely.
+  const [geoCoords, setGeoCoords] = useState<{ lat: number; lon: number } | null>(null)
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'locating' | 'success' | 'error'>('idle')
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { setGeoStatus('error'); return }
+    setGeoStatus('locating')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude })
+        setGeoStatus('success')
+      },
+      () => setGeoStatus('error'),
+      { timeout: 10000 },
+    )
+  }
 
   const update = (field: string) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -207,14 +223,17 @@ export default function ProviderPortal() {
         description: form.description,
         category: form.category,
         price_per_day: parseFloat(form.price_per_day),
-        lat: parseFloat(form.lat),
-        lon: parseFloat(form.lon),
         address: form.address,
         capacity: form.capacity ? parseInt(form.capacity) : null,
+        // A pasted maps link takes priority server-side; geolocation is the fallback.
+        ...(form.maps_link.trim() ? { maps_link: form.maps_link.trim() } : {}),
+        ...(geoCoords ? { lat: geoCoords.lat, lon: geoCoords.lon } : {}),
       })
       setSuccess(true)
       setShowForm(false)
-      setForm({ title: '', description: '', category: 'banquet_hall', price_per_day: '', lat: '19.0760', lon: '72.8777', address: '', capacity: '' })
+      setForm({ title: '', description: '', category: 'banquet_hall', price_per_day: '', address: '', capacity: '', maps_link: '' })
+      setGeoCoords(null)
+      setGeoStatus('idle')
       setSafetyNote(null)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err: any) {
@@ -362,15 +381,36 @@ export default function ProviderPortal() {
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
                       placeholder="Lokhandwala Complex, Andheri West, Mumbai" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
-                    <input type="number" step="any" value={form.lat} onChange={update('lat')} required
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
-                    <input type="number" step="any" value={form.lon} onChange={update('lon')} required
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy" />
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Location <span className="text-gray-400 font-normal">(paste a Google Maps link, or use your current location)</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={form.maps_link}
+                        onChange={update('maps_link')}
+                        className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
+                        placeholder="https://maps.google.com/... or a maps.app.goo.gl link"
+                      />
+                      <button
+                        type="button"
+                        onClick={useMyLocation}
+                        disabled={geoStatus === 'locating'}
+                        className="shrink-0 flex items-center gap-1.5 text-sm font-medium text-navy border border-navy/20 rounded-xl px-3 hover:bg-navy/5 transition-colors disabled:opacity-50"
+                      >
+                        {geoStatus === 'locating'
+                          ? <Loader2 size={14} className="animate-spin" />
+                          : <LocateFixed size={14} />}
+                        Use my location
+                      </button>
+                    </div>
+                    {geoStatus === 'success' && (
+                      <p className="text-xs text-green-600 mt-1">Current location captured ✓</p>
+                    )}
+                    {geoStatus === 'error' && (
+                      <p className="text-xs text-amber-600 mt-1">Couldn't get your location — paste a Maps link instead, or leave blank and add it later.</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Capacity (optional)</label>

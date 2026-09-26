@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Loader2, MapPin } from 'lucide-react'
+import { Search, Loader2, MapPin, LocateFixed } from 'lucide-react'
 import { matchAPI, listingsAPI } from '../api/client'
 import type { MatchResultItem, Listing } from '../api/client'
 import { authStore } from '../store/auth'
@@ -91,6 +91,24 @@ export default function SeekerPortal() {
   const [minCapacity, setMinCapacity] = useState('')
   const [sort, setSort] = useState<SortOption>('best_match')
 
+  // Phase 36 (Addendum 4): real distance scoring needs the seeker's own
+  // location — captured only via the browser's own geolocation, never typed.
+  const [geoCoords, setGeoCoords] = useState<{ lat: number; lon: number } | null>(null)
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'locating' | 'success' | 'error'>('idle')
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { setGeoStatus('error'); return }
+    setGeoStatus('locating')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude })
+        setGeoStatus('success')
+      },
+      () => setGeoStatus('error'),
+      { timeout: 10000 },
+    )
+  }
+
   // Default "browse all" view — every active listing, newest first, shown
   // until a real search is run. Without this, a page titled "Browse
   // Available Resources" showed nothing at all (including newly created
@@ -113,7 +131,7 @@ export default function SeekerPortal() {
     setError('')
     setSearched(true)
     try {
-      const res = await matchAPI.match(query.trim(), parseFloat(budget) || 0)
+      const res = await matchAPI.match(query.trim(), parseFloat(budget) || 0, geoCoords?.lat, geoCoords?.lon)
       setResults(res.data.results)
     } catch {
       setError('Search failed. Make sure the backend is running.')
@@ -184,12 +202,29 @@ export default function SeekerPortal() {
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-navy"
               />
             </div>
+            <button
+              type="button"
+              onClick={useMyLocation}
+              disabled={geoStatus === 'locating'}
+              title="Use my current location to rank results by distance"
+              className={`shrink-0 flex items-center gap-1.5 px-3 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50 ${
+                geoStatus === 'success' ? 'border-green-300 text-green-700 bg-green-50' : 'border-gray-200 text-navy hover:bg-navy/5'
+              }`}
+            >
+              {geoStatus === 'locating' ? <Loader2 size={14} className="animate-spin" /> : <LocateFixed size={14} />}
+            </button>
             <button type="submit" disabled={loading || !query.trim()}
               className="bg-navy text-white px-6 py-3 rounded-xl font-semibold text-sm disabled:opacity-40 flex items-center gap-2 hover:bg-navy-light transition-colors shrink-0">
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
               Search
             </button>
           </div>
+          {geoStatus === 'success' && (
+            <p className="text-xs text-green-600 mt-2">Using your current location to rank results by distance ✓</p>
+          )}
+          {geoStatus === 'error' && (
+            <p className="text-xs text-amber-600 mt-2">Couldn't get your location — search still works, just without distance ranking.</p>
+          )}
         </form>
 
         <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">

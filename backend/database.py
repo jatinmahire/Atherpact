@@ -64,8 +64,11 @@ class Asset(Base):
     description   = Column(Text, nullable=False)
     category      = Column(String, nullable=False)          # e.g. "banquet_hall"
     price_per_day = Column(Float, nullable=False)
-    lat           = Column(Float, nullable=False)
-    lon           = Column(Float, nullable=False)
+    # Phase 36 (Addendum 4): auto-populated only, never a raw human-typed
+    # value — nullable because a pasted/short link may fail to resolve.
+    lat           = Column(Float, nullable=True)
+    lon           = Column(Float, nullable=True)
+    maps_link     = Column(String, nullable=True)
     address       = Column(String, nullable=False)
     capacity      = Column(Integer, nullable=True)
     is_active     = Column(Boolean, default=True)
@@ -113,6 +116,7 @@ class Requirement(Base):
     budget      = Column(Float, default=0.0)
     lat         = Column(Float, nullable=True)
     lon         = Column(Float, nullable=True)
+    maps_link   = Column(String, nullable=True)  # Phase 36 (Addendum 4)
     created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -370,6 +374,9 @@ def seed_database(db: Session) -> None:
     # Seed assets (FK references user above)
     for data in SEED_ASSETS:
         if not db.get(Asset, data["id"]):
+            # Phase 36 (Addendum 4): seed fixtures already have real lat/lon,
+            # so derive the same display link create_listing would build.
+            data = {**data, "maps_link": f"https://www.google.com/maps?q={data['lat']},{data['lon']}"}
             db.add(Asset(**data))
 
     db.commit()
