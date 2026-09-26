@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MapPin, Loader2, Star, Repeat, BadgeCheck } from 'lucide-react'
-import { listingsAPI, reviewsAPI } from '../api/client'
+import { listingsAPI, reviewsAPI, listingImageUrl } from '../api/client'
 import type { Listing, ProviderReviews, RecurringAvailabilityRule, MatchResultItem, BundlingSuggestion } from '../api/client'
 import { authStore } from '../store/auth'
 import Navbar from '../components/Navbar'
@@ -81,9 +81,14 @@ export default function ListingDetail() {
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
         <div>
-          <div className="w-full h-56 rounded-2xl bg-lavender/20 flex items-center justify-center text-7xl mb-6">
-            {CATEGORY_ICON[listing.category] ?? '📦'}
-          </div>
+          {listing.image_path ? (
+            <img src={listingImageUrl(listing.image_path)} alt={listing.title}
+              className="w-full h-56 rounded-2xl object-cover mb-6" />
+          ) : (
+            <div className="w-full h-56 rounded-2xl bg-lavender/20 flex items-center justify-center text-7xl mb-6">
+              {CATEGORY_ICON[listing.category] ?? '📦'}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-2xl font-bold text-gray-900">{listing.title}</h1>

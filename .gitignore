@@ -17,6 +17,9 @@ backend/aetherpact.db-wal
 backend/audit_images/*.jpg
 backend/audit_images/*.jpeg
 backend/audit_images/*.png
+backend/listing_images/*.jpg
+backend/listing_images/*.jpeg
+backend/listing_images/*.png
 backend/data/vision_triage/
 backend/server_out.log
 backend/server_err.log

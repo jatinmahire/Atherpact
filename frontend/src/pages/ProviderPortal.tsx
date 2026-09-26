@@ -5,9 +5,9 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown, Star, CalendarCheck, Gift, Copy, LocateFixed } from 'lucide-react'
-import { listingsAPI, analyticsAPI, authAPI } from '../api/client'
-import type { Listing, RecurringAvailabilityRule, ProviderAnalytics, ReferralStatus } from '../api/client'
+import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown, Star, CalendarCheck, Gift, Copy, LocateFixed, Image as ImageIcon, CalendarRange, User as UserIcon } from 'lucide-react'
+import { listingsAPI, analyticsAPI, authAPI, bookingsAPI, listingImageUrl } from '../api/client'
+import type { Listing, RecurringAvailabilityRule, AvailabilityWindow, ProviderAnalytics, ReferralStatus, ProviderBookingItem } from '../api/client'
 import { authStore } from '../store/auth'
 import { useNavigate } from 'react-router-dom'
 
@@ -103,6 +103,106 @@ function RecurringAvailabilityControl({ assetId }: { assetId: string }) {
   )
 }
 
+/** Addendum 5: provider-facing control for a one-off "available from X to Y"
+ * window — purely informational (booking conflicts are still decided by
+ * real overlapping bookings/recurring blocks), but a real, persisted way
+ * for a provider to communicate an available date/time range. */
+function AvailabilityWindowControl({ assetId }: { assetId: string }) {
+  const [open, setOpen] = useState(false)
+  const [windows, setWindows] = useState<AvailabilityWindow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const defaultWindow = defaultAvailabilityWindow()
+  const [form, setForm] = useState(defaultWindow)
+
+  const loadWindows = () => {
+    setLoading(true)
+    listingsAPI.listAvailabilityWindows(assetId)
+      .then((res) => setWindows(res.data))
+      .catch(() => setError('Could not load availability windows'))
+      .finally(() => setLoading(false))
+  }
+
+  const toggle = () => {
+    const next = !open
+    setOpen(next)
+    if (next && windows.length === 0) loadWindows()
+  }
+
+  const addWindow = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      await listingsAPI.createAvailabilityWindow(assetId, {
+        starts_at: new Date(form.starts_at).toISOString(),
+        ends_at: new Date(form.ends_at).toISOString(),
+      })
+      loadWindows()
+    } catch (err: any) {
+      setError(err?.response?.data?.detail ?? 'Failed to add availability window')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <button onClick={toggle} className="flex items-center gap-1.5 text-xs text-navy font-medium hover:underline">
+        <CalendarRange size={12} /> Available date/time range
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+          <ChevronDown size={12} />
+        </motion.span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="mt-3 space-y-2">
+              {loading ? (
+                <p className="text-xs text-gray-400">Loading…</p>
+              ) : windows.length === 0 ? (
+                <p className="text-xs text-gray-400">No available windows declared yet.</p>
+              ) : (
+                windows.map((w) => (
+                  <div key={w.id} className="text-xs bg-gray-50 rounded-lg px-2.5 py-1.5">
+                    {new Date(w.starts_at).toLocaleString('en-IN')} → {new Date(w.ends_at).toLocaleString('en-IN')}
+                  </div>
+                ))
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <input type="datetime-local" value={form.starts_at}
+                  onChange={(e) => setForm((p) => ({ ...p, starts_at: e.target.value }))}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs" />
+                <span className="text-xs text-gray-400">to</span>
+                <input type="datetime-local" value={form.ends_at}
+                  onChange={(e) => setForm((p) => ({ ...p, ends_at: e.target.value }))}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs" />
+                <button onClick={addWindow} disabled={saving}
+                  className="text-xs bg-navy text-white px-3 py-1 rounded-lg font-medium disabled:opacity-50 flex items-center gap-1">
+                  {saving && <Loader2 size={10} className="animate-spin" />} Add window
+                </button>
+              </div>
+              {error && <p className="text-xs text-red-500">{error}</p>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function defaultAvailabilityWindow() {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const toLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const starts = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  starts.setHours(9, 0, 0, 0)
+  const ends = new Date(starts.getTime() + 7 * 24 * 60 * 60 * 1000)
+  ends.setHours(21, 0, 0, 0)
+  return { starts_at: toLocal(starts), ends_at: toLocal(ends) }
+}
+
 const CATEGORIES = [
   { value: 'banquet_hall',      label: '🏛️ Banquet Hall' },
   { value: 'commercial_kitchen', label: '🍳 Commercial Kitchen' },
@@ -151,11 +251,16 @@ export default function ProviderPortal() {
   const [submitting, setSubmitting]     = useState(false)
   const [checkingDesc, setCheckingDesc] = useState(false)
   const [success, setSuccess]           = useState(false)
+  const [providerBookings, setProviderBookings] = useState<ProviderBookingItem[]>([])
+  const [loadingBookings, setLoadingBookings]   = useState(true)
 
   const [form, setForm] = useState({
     title: '', description: '', category: 'banquet_hall',
     price_per_day: '', address: '', capacity: '', maps_link: '',
   })
+  // Addendum 5: a real photo is required for every new listing.
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoError, setPhotoError] = useState('')
   // Phase 36 (Addendum 4): coordinates are never raw-typed — only captured
   // via the browser's own geolocation, kept out of the visible form entirely.
   const [geoCoords, setGeoCoords] = useState<{ lat: number; lon: number } | null>(null)
@@ -188,6 +293,16 @@ export default function ProviderPortal() {
       const mine = res.data.filter((l) => l.owner_id === user.id)
       setListings(mine)
     }).finally(() => setLoadingList(false))
+  }, [success, user?.id])
+
+  // Addendum 5: real confirmed deals for the provider's own listings, with
+  // the seeker's actually-selected date/time.
+  useEffect(() => {
+    if (!user?.id) return
+    bookingsAPI.listProvider()
+      .then((res) => setProviderBookings(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingBookings(false))
   }, [success, user?.id])
 
   // Real dashboard analytics (completed bookings, average rating) — closes
@@ -227,9 +342,14 @@ export default function ProviderPortal() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setPhotoError('')
+    if (!photoFile) {
+      setPhotoError('A photo of the resource is required.')
+      return
+    }
     setSubmitting(true)
     try {
-      await listingsAPI.create({
+      const created = await listingsAPI.create({
         title: form.title,
         description: form.description,
         category: form.category,
@@ -240,12 +360,14 @@ export default function ProviderPortal() {
         ...(form.maps_link.trim() ? { maps_link: form.maps_link.trim() } : {}),
         ...(geoCoords ? { lat: geoCoords.lat, lon: geoCoords.lon } : {}),
       })
+      await listingsAPI.uploadImage(created.data.id, photoFile)
       setSuccess(true)
       setShowForm(false)
       setForm({ title: '', description: '', category: 'banquet_hall', price_per_day: '', address: '', capacity: '', maps_link: '' })
       setGeoCoords(null)
       setGeoStatus('idle')
       setSafetyNote(null)
+      setPhotoFile(null)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err: any) {
       alert(err?.response?.data?.detail ?? 'Failed to create listing')
@@ -429,6 +551,22 @@ export default function ProviderPortal() {
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
                       placeholder="e.g. 200" />
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Photo <span className="text-red-500">(required)</span>
+                    </label>
+                    <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-500 cursor-pointer hover:border-navy hover:text-navy transition-colors">
+                      <ImageIcon size={16} />
+                      {photoFile ? photoFile.name : 'Choose a photo of the resource…'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => { setPhotoFile(e.target.files?.[0] ?? null); setPhotoError('') }}
+                      />
+                    </label>
+                    {photoError && <p className="text-xs text-red-600 mt-1">{photoError}</p>}
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-2">
@@ -463,9 +601,19 @@ export default function ProviderPortal() {
               <motion.div key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
                 className="bg-white rounded-2xl border border-lavender/20 shadow-sm p-5">
                 <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{l.title}</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">{l.category} · {l.address}</p>
+                  <div className="flex items-center gap-3">
+                    {l.image_path ? (
+                      <img src={listingImageUrl(l.image_path)} alt={l.title}
+                        className="w-14 h-14 rounded-xl object-cover shrink-0" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                        <ImageIcon size={18} className="text-gray-300" />
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{l.title}</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">{l.category} · {l.address}</p>
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
                     <div className="font-bold text-navy">₹{l.price_per_day.toLocaleString('en-IN')}/day</div>
@@ -473,7 +621,43 @@ export default function ProviderPortal() {
                   </div>
                 </div>
                 <RecurringAvailabilityControl assetId={l.id} />
+                <AvailabilityWindowControl assetId={l.id} />
               </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* Confirmed deals (Addendum 5): real bookings on the provider's own
+            listings, with the seeker's actually-selected date/time. */}
+        <h2 className="font-bold text-gray-900 text-lg mb-4 mt-10">Confirmed Deals</h2>
+        {loadingBookings ? (
+          <div className="h-16 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+        ) : providerBookings.length === 0 ? (
+          <div className="text-center py-10 text-gray-400">
+            <p>No confirmed deals yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {providerBookings.map((b) => (
+              <div key={b.id} className="bg-white rounded-2xl border border-lavender/20 shadow-sm p-4 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">{b.asset_title ?? 'Listing'}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                    <UserIcon size={11} /> {b.seeker_name} ({b.seeker_email})
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {new Date(b.starts_at).toLocaleString('en-IN')} → {new Date(b.ends_at).toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="text-right shrink-0 text-xs">
+                  <span className={`inline-block px-2 py-0.5 rounded-full font-medium ${
+                    b.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
+                    b.payment_status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {b.payment_status}
+                  </span>
+                </div>
+              </div>
             ))}
           </div>
         )}

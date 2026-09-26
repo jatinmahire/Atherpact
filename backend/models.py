@@ -64,6 +64,7 @@ class ListingOut(BaseModel):
     maps_link: Optional[str] = None
     address: str
     capacity: Optional[int]
+    image_path: Optional[str] = None
     is_active: bool
     created_at: datetime
     owner_verified: bool = False  # Phase 15 (Addendum 2): true only if owner has a real verified_at
@@ -89,6 +90,23 @@ class RecurringAvailabilityRuleOut(BaseModel):
     end_time: str
     recurrence_end_date: Optional[datetime]
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ── One-off Availability Windows ────────────────────────────────────────────
+
+class AvailabilityWindowCreate(BaseModel):
+    starts_at: datetime
+    ends_at: datetime
+
+
+class AvailabilityWindowOut(BaseModel):
+    id: str
+    asset_id: str
+    starts_at: datetime
+    ends_at: datetime
 
     class Config:
         from_attributes = True

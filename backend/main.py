@@ -95,6 +95,10 @@ from pathlib import Path
 Path("audit_images").mkdir(exist_ok=True)
 app.mount("/audit_images", StaticFiles(directory="audit_images"), name="audit_images")
 
+# Serve uploaded listing photos (Addendum 5)
+Path("listing_images").mkdir(exist_ok=True)
+app.mount("/listing_images", StaticFiles(directory="listing_images"), name="listing_images")
+
 
 @app.get("/health")
 def health():

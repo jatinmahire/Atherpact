@@ -48,9 +48,16 @@ export interface Listing {
   maps_link: string | null
   address: string
   capacity: number | null
+  image_path: string | null
   is_active: boolean
   created_at: string
   owner_verified: boolean
+}
+
+/** Builds a browsable URL for a stored listing image_path. */
+export function listingImageUrl(imagePath: string): string {
+  const filename = imagePath.split(/[\\/]/).pop()
+  return `/listing_images/${filename}`
 }
 
 export interface ListingCreatePayload {
@@ -172,6 +179,28 @@ export const listingsAPI = {
 
   getBundling: (assetId: string) =>
     api.get<BundlingSuggestion[]>(`/listings/${assetId}/bundling`),
+
+  // Addendum 5
+  uploadImage: (assetId: string, file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return api.post<Listing>(`/listings/${assetId}/image`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
+  listAvailabilityWindows: (assetId: string) =>
+    api.get<AvailabilityWindow[]>(`/listings/${assetId}/availability-window`),
+
+  createAvailabilityWindow: (assetId: string, data: { starts_at: string; ends_at: string }) =>
+    api.post<AvailabilityWindow>(`/listings/${assetId}/availability-window`, data),
+}
+
+export interface AvailabilityWindow {
+  id: string
+  asset_id: string
+  starts_at: string
+  ends_at: string
 }
 
 // ─── Match ───────────────────────────────────────────────────────────────────
@@ -239,6 +268,23 @@ export const bookingsAPI = {
 
   verifyPayment: (bookingId: string, data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
     api.post<BookingItem>(`/bookings/${bookingId}/verify-payment`, data),
+
+  // Addendum 5: provider's own confirmed deals with the seeker's real date/time
+  listProvider: () => api.get<ProviderBookingItem[]>('/bookings/provider'),
+}
+
+export interface ProviderBookingItem {
+  id: string
+  asset_id: string
+  asset_title: string | null
+  seeker_id: string
+  seeker_name: string
+  seeker_email: string
+  starts_at: string
+  ends_at: string
+  status: string
+  payment_status: string
+  created_at: string
 }
 
 // ─── Audit ────────────────────────────────────────────────────────────────────

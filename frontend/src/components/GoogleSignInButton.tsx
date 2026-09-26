@@ -5,21 +5,34 @@
  */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { signInWithPopup } from 'firebase/auth'
+import { signInWithPopup, getAdditionalUserInfo } from 'firebase/auth'
 import { Loader2 } from 'lucide-react'
 import { auth, googleProvider } from '../lib/firebase'
+import { authAPI } from '../api/client'
+import { authStore } from '../store/auth'
 
 export default function GoogleSignInButton() {
   const nav = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // First-time Google sign-up: Firebase has no PROVIDER/SEEKER/BOTH concept,
+  // so a brand-new account needs one real question before it's usable.
+  const [needsRole, setNeedsRole] = useState(false)
+  const [pendingName, setPendingName] = useState('')
+  const [savingRole, setSavingRole] = useState(false)
 
   const handleClick = async () => {
     setError('')
     setLoading(true)
     try {
-      await signInWithPopup(auth, googleProvider)
-      nav('/')
+      const cred = await signInWithPopup(auth, googleProvider)
+      const info = getAdditionalUserInfo(cred)
+      if (info?.isNewUser) {
+        setPendingName(cred.user.displayName || 'New User')
+        setNeedsRole(true)
+      } else {
+        nav('/')
+      }
     } catch (err: any) {
       if (err?.code !== 'auth/popup-closed-by-user') {
         setError('Google sign-in failed. Please try again.')
@@ -27,6 +40,45 @@ export default function GoogleSignInButton() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const chooseRole = async (role: string) => {
+    setSavingRole(true)
+    try {
+      const res = await authAPI.register(pendingName, role)
+      authStore.setUser(res.data)
+      nav('/')
+    } catch {
+      setError('Could not save your role — please try again.')
+    } finally {
+      setSavingRole(false)
+    }
+  }
+
+  if (needsRole) {
+    return (
+      <div className="border border-lavender/30 rounded-xl p-4 bg-lavender/5">
+        <p className="text-sm font-medium text-gray-800 mb-3">Welcome, {pendingName}! Are you a…</p>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { value: 'seeker', label: 'Seeker' },
+            { value: 'provider', label: 'Provider' },
+            { value: 'both', label: 'Both' },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={savingRole}
+              onClick={() => chooseRole(opt.value)}
+              className="border border-gray-200 rounded-xl py-2 text-sm font-medium text-gray-700 hover:bg-white hover:border-navy transition-colors disabled:opacity-50"
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {error && <p className="text-xs text-red-600 mt-2 text-center">{error}</p>}
+      </div>
+    )
   }
 
   return (

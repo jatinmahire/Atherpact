@@ -199,6 +199,53 @@ def list_bookings(
     return result
 
 
+class ProviderBookingOut(BaseModel):
+    """Addendum 5: a provider's own confirmed deals, with the seeker's
+    actually-selected date/time — never fabricated, straight from the
+    booking row the seeker created."""
+    id: str
+    asset_id: str
+    asset_title: Optional[str]
+    seeker_id: str
+    seeker_name: str
+    seeker_email: str
+    starts_at: datetime
+    ends_at: datetime
+    status: str
+    payment_status: str
+    created_at: datetime
+
+
+@router.get("/provider", response_model=List[ProviderBookingOut])
+def list_provider_bookings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    owned_asset_ids = [a.id for a in db.query(Asset).filter(Asset.owner_id == current_user.id).all()]
+    if not owned_asset_ids:
+        return []
+    bookings = (
+        db.query(Booking)
+        .filter(Booking.asset_id.in_(owned_asset_ids))
+        .order_by(Booking.starts_at.desc())
+        .all()
+    )
+    result = []
+    for b in bookings:
+        asset = db.get(Asset, b.asset_id)
+        seeker = db.get(User, b.seeker_id)
+        result.append(ProviderBookingOut(
+            id=b.id, asset_id=b.asset_id, asset_title=asset.title if asset else None,
+            seeker_id=b.seeker_id,
+            seeker_name=seeker.display_name if seeker else "Unknown",
+            seeker_email=seeker.email if seeker else "",
+            starts_at=b.starts_at, ends_at=b.ends_at,
+            status=b.status, payment_status=b.payment_status,
+            created_at=b.created_at,
+        ))
+    return result
+
+
 def _get_own_booking(db: Session, booking_id: str, current_user: User) -> Booking:
     booking = db.get(Booking, booking_id)
     if not booking:

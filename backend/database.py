@@ -74,6 +74,10 @@ class Asset(Base):
     maps_link     = Column(String, nullable=True)
     address       = Column(String, nullable=False)
     capacity      = Column(Integer, nullable=True)
+    # Addendum 5: a real photo, required for new listings (enforced in the
+    # router/frontend, not the column, so pre-existing seed listings without
+    # one don't become invalid).
+    image_path    = Column(String, nullable=True)
     is_active     = Column(Boolean, default=True)
     created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

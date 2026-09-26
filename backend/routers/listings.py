@@ -3,23 +3,28 @@ AetherPact — Listings router.
 Phase 2: POST /listings, GET /listings, with hard conflict checking.
 """
 
+import shutil
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session
 
-from database import get_db, Asset, Booking, RecurringAvailabilityRule
+from database import get_db, Asset, Booking, RecurringAvailabilityRule, AvailabilityWindow
 from models import (
     ListingCreate, ListingOut, RecurringAvailabilityRuleCreate, RecurringAvailabilityRuleOut,
-    BundlingSuggestionOut,
+    BundlingSuggestionOut, AvailabilityWindowCreate, AvailabilityWindowOut,
 )
 from routers.auth import get_current_user
 from database import User
 from services import vector_index
 from services.location_resolver import resolve_location
+
+LISTING_IMAGE_DIR = Path("listing_images")
+LISTING_IMAGE_DIR.mkdir(exist_ok=True)
 
 
 def _rebuild_vector_index(db: Session) -> None:
@@ -271,3 +276,73 @@ def list_recurring_availability_rules(asset_id: str, db: Session = Depends(get_d
         .order_by(RecurringAvailabilityRule.day_of_week)
         .all()
     )
+
+
+# ── One-off Availability Windows (Addendum 5) ──────────────────────────────────
+# Provider-declared "this asset is available from X to Y" ranges. Purely
+# informational for now: booking conflicts are still decided solely by
+# check_no_booking_conflict (other confirmed bookings + recurring blocks),
+# so this never changes existing booking behavior — it only gives providers
+# a real, persisted way to communicate an available date/time range.
+
+@router.post("/{asset_id}/availability-window", response_model=AvailabilityWindowOut)
+def create_availability_window(
+    asset_id: str,
+    req: AvailabilityWindowCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    if asset.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only this listing's owner can set its availability")
+    if req.ends_at <= req.starts_at:
+        raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
+
+    window = AvailabilityWindow(
+        id=str(uuid.uuid4()), asset_id=asset_id,
+        starts_at=req.starts_at, ends_at=req.ends_at,
+    )
+    db.add(window)
+    db.commit()
+    db.refresh(window)
+    return window
+
+
+@router.get("/{asset_id}/availability-window", response_model=List[AvailabilityWindowOut])
+def list_availability_windows(asset_id: str, db: Session = Depends(get_db)):
+    return (
+        db.query(AvailabilityWindow)
+        .filter(AvailabilityWindow.asset_id == asset_id)
+        .order_by(AvailabilityWindow.starts_at)
+        .all()
+    )
+
+
+# ── Listing Photo (Addendum 5 — required for new listings) ─────────────────────
+
+@router.post("/{asset_id}/image", response_model=ListingOut)
+async def upload_listing_image(
+    asset_id: str,
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    if asset.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only this listing's owner can set its photo")
+
+    ext = Path(image.filename or "").suffix or ".jpg"
+    filename = f"{asset_id}{ext}"
+    dest = LISTING_IMAGE_DIR / filename
+    with dest.open("wb") as f:
+        shutil.copyfileobj(image.file, f)
+
+    asset.image_path = str(dest)
+    db.commit()
+    db.refresh(asset)
+    attach_owner_verified(db, [asset])
+    return asset

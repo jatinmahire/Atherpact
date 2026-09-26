@@ -40,6 +40,23 @@ const RISK_LABELS: Record<string, string> = {
   high_risk:   '🔴 High Dispute Risk',
 }
 
+// Addendum 5: real, seeker-picked start/end date+time instead of a
+// hardcoded "now to +7 days" window, formatted for a datetime-local input
+// (local time, no timezone conversion — new Date(value).toISOString() at
+// submit time handles that).
+function toDatetimeLocalValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function defaultBookingWindow() {
+  const starts = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  starts.setHours(10, 0, 0, 0)
+  const ends = new Date(starts.getTime() + 24 * 60 * 60 * 1000)
+  ends.setHours(18, 0, 0, 0)
+  return { starts_at: toDatetimeLocalValue(starts), ends_at: toDatetimeLocalValue(ends) }
+}
+
 export default function NegotiatePage({ item, onClose }: Props) {
   const { asset } = item
   const [form, setForm] = useState({
@@ -48,6 +65,7 @@ export default function NegotiatePage({ item, onClose }: Props) {
     seeker_offer: Math.round(asset.price_per_day * 0.7).toString(),
     seeker_max:   Math.round(asset.price_per_day * 0.9).toString(),
     extra_terms:  '',
+    ...defaultBookingWindow(),
   })
   const [result, setResult]   = useState<NegotiateResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -163,6 +181,19 @@ export default function NegotiatePage({ item, onClose }: Props) {
                   placeholder="e.g. Security deposit ₹5000, no loud music after 10pm…" />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Starts</label>
+                  <input type="datetime-local" value={form.starts_at} onChange={update('starts_at')} required
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-navy" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Ends</label>
+                  <input type="datetime-local" value={form.ends_at} onChange={update('ends_at')} required
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-navy" />
+                </div>
+              </div>
+
               <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
                 <input type="checkbox" checked={multiRound} onChange={(e) => setMultiRound(e.target.checked)}
                   className="rounded border-gray-300 text-navy focus:ring-navy" />
@@ -252,13 +283,11 @@ export default function NegotiatePage({ item, onClose }: Props) {
                             let bId = bookingId
                             if (!bId) {
                               setPaymentState('creating_booking')
-                              const now = new Date()
-                              const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
                               const bookingRes = await bookingsAPI.create({
                                 asset_id: asset.id,
                                 negotiation_id: result.negotiation_id,
-                                starts_at: now.toISOString(),
-                                ends_at: end.toISOString(),
+                                starts_at: new Date(form.starts_at).toISOString(),
+                                ends_at: new Date(form.ends_at).toISOString(),
                               })
                               bId = bookingRes.data.id
                               setBookingId(bId)
