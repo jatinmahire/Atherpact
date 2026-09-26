@@ -205,7 +205,7 @@ export default function ProviderPortal() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-lavender/10">
       {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto border-b border-lavender/20 bg-white/80 backdrop-blur sticky top-0 z-10">
+      <nav className="flex items-center justify-between px-4 py-4 max-w-6xl mx-auto border-b border-lavender/20 bg-white/80 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
             <span className="text-white text-sm font-bold">Æ</span>
@@ -221,7 +221,7 @@ export default function ProviderPortal() {
         </div>
       </nav>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-5xl mx-auto px-4 py-8">
         {/* Revenue summary */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
           {[
