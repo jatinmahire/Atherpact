@@ -69,6 +69,28 @@ class ListingOut(BaseModel):
         from_attributes = True
 
 
+# ── Recurring Availability (Phase 12, Addendum 2) ──────────────────────────────
+
+class RecurringAvailabilityRuleCreate(BaseModel):
+    day_of_week: int = Field(ge=0, le=6, description="0=Monday ... 6=Sunday")
+    start_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$", description="HH:MM, 24h")
+    end_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$", description="HH:MM, 24h")
+    recurrence_end_date: Optional[datetime] = None
+
+
+class RecurringAvailabilityRuleOut(BaseModel):
+    id: str
+    asset_id: str
+    day_of_week: int
+    start_time: str
+    end_time: str
+    recurrence_end_date: Optional[datetime]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # ── Match ─────────────────────────────────────────────────────────────────────
 
 class MatchRequest(BaseModel):

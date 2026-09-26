@@ -93,6 +93,17 @@ def _distance_score(
 # Public scoring function
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _combine_scores(sem: float, price: float, dist: float) -> dict:
+    sem, price, dist = round(sem, 3), round(price, 3), round(dist, 3)
+    final = round(0.5 * sem + 0.3 * price + 0.2 * dist, 3)
+    return {
+        "semantic_score":  sem,
+        "price_score":     price,
+        "distance_score":  dist,
+        "final_score":     final,
+    }
+
+
 def score_listing(
     query_embedding: np.ndarray,
     listing_description: str,
@@ -104,24 +115,17 @@ def score_listing(
     req_lon: Optional[float],
 ) -> dict:
     """
-    Compute the full score breakdown for one listing against a query.
-    Returns a dict with semantic_score, price_score, distance_score, final_score
-    all rounded to 3 decimal places.
+    Compute the full score breakdown for one listing against a query, encoding
+    the listing description directly. Kept for any caller without access to
+    the Phase 12 cached vector index; rank_listings below uses the faster,
+    cached path instead.
     """
     model = get_model()
     listing_emb = model.encode(listing_description, convert_to_numpy=True)
-
-    sem   = round(max(0.0, _cosine(query_embedding, listing_emb)), 3)
-    price = round(_price_score(listing_price, budget), 3)
-    dist  = round(_distance_score(req_lat, req_lon, listing_lat, listing_lon), 3)
-    final = round(0.5 * sem + 0.3 * price + 0.2 * dist, 3)
-
-    return {
-        "semantic_score":  sem,
-        "price_score":     price,
-        "distance_score":  dist,
-        "final_score":     final,
-    }
+    sem   = max(0.0, _cosine(query_embedding, listing_emb))
+    price = _price_score(listing_price, budget)
+    dist  = _distance_score(req_lat, req_lon, listing_lat, listing_lon)
+    return _combine_scores(sem, price, dist)
 
 
 def rank_listings(
@@ -133,25 +137,34 @@ def rank_listings(
     top_k: int = 5,
 ) -> list:
     """
-    Embed `query`, score every listing, return the top-k sorted descending by final_score.
+    Phase 12 (Addendum 2): embed `query` once, look up every listing's cached
+    semantic_score from the vector index (services.vector_index) instead of
+    re-encoding each listing's description on every request, then apply the
+    exact same price/distance/final formula as before over every listing —
+    so the final ranking is unchanged, only how semantic_score is obtained.
+
+    Returns the top-k sorted descending by final_score.
     Each item: {"asset": <ORM Asset>, "scores": {semantic_score, ...}}.
     """
+    from services import vector_index  # deferred: avoids a circular import
+
     model = get_model()
     query_emb = model.encode(query, convert_to_numpy=True)
+    cached_scores = vector_index.search_all(query_emb) if vector_index.is_ready() else {}
 
     scored = []
     for asset in listings:
-        scores = score_listing(
-            query_embedding=query_emb,
-            listing_description=asset.description,
-            listing_price=asset.price_per_day,
-            listing_lat=asset.lat,
-            listing_lon=asset.lon,
-            budget=budget,
-            req_lat=req_lat,
-            req_lon=req_lon,
-        )
-        scored.append({"asset": asset, "scores": scores})
+        if asset.id in cached_scores:
+            sem = cached_scores[asset.id]
+        else:
+            # Not yet in the index (e.g. rebuild hasn't run) — fall back to a
+            # direct encode so a listing is never silently dropped from ranking.
+            listing_emb = model.encode(asset.description, convert_to_numpy=True)
+            sem = max(0.0, _cosine(query_emb, listing_emb))
+
+        price = _price_score(asset.price_per_day, budget)
+        dist  = _distance_score(req_lat, req_lon, asset.lat, asset.lon)
+        scored.append({"asset": asset, "scores": _combine_scores(sem, price, dist)})
 
     scored.sort(key=lambda x: x["scores"]["final_score"], reverse=True)
     return scored[:top_k]

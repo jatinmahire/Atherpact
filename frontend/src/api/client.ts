@@ -90,6 +90,16 @@ export const authAPI = {
 
 // ─── Listings ─────────────────────────────────────────────────────────────────
 
+export interface RecurringAvailabilityRule {
+  id: string
+  asset_id: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+  recurrence_end_date: string | null
+  created_at: string
+}
+
 export const listingsAPI = {
   list: (category?: string) =>
     api.get<Listing[]>('/listings', { params: category ? { category } : {} }),
@@ -101,6 +111,12 @@ export const listingsAPI = {
 
   checkSafety: (description: string) =>
     api.post('/listings/check', { description }),
+
+  listRecurringAvailability: (assetId: string) =>
+    api.get<RecurringAvailabilityRule[]>(`/listings/${assetId}/recurring-availability`),
+
+  createRecurringAvailability: (assetId: string, rule: { day_of_week: number; start_time: string; end_time: string }) =>
+    api.post<RecurringAvailabilityRule>(`/listings/${assetId}/recurring-availability`, rule),
 }
 
 // ─── Match ───────────────────────────────────────────────────────────────────

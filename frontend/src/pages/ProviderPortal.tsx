@@ -5,11 +5,103 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp } from 'lucide-react'
+import { Plus, Loader2, AlertTriangle, CheckCircle, TrendingUp, Repeat, ChevronDown } from 'lucide-react'
 import { listingsAPI } from '../api/client'
-import type { Listing } from '../api/client'
+import type { Listing, RecurringAvailabilityRule } from '../api/client'
 import { authStore } from '../store/auth'
 import { useNavigate } from 'react-router-dom'
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+/** Phase 12 (Addendum 2): provider-facing control for a standing weekly
+ * block, e.g. "every Tuesday, 14:00 to 18:00", instead of manually entering
+ * every future date a resource is unavailable. */
+function RecurringAvailabilityControl({ assetId }: { assetId: string }) {
+  const [open, setOpen] = useState(false)
+  const [rules, setRules] = useState<RecurringAvailabilityRule[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [form, setForm] = useState({ day_of_week: 1, start_time: '14:00', end_time: '18:00' })
+
+  const loadRules = () => {
+    setLoading(true)
+    listingsAPI.listRecurringAvailability(assetId)
+      .then((res) => setRules(res.data))
+      .catch(() => setError('Could not load recurring blocks'))
+      .finally(() => setLoading(false))
+  }
+
+  const toggle = () => {
+    const next = !open
+    setOpen(next)
+    if (next && rules.length === 0) loadRules()
+  }
+
+  const addRule = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      await listingsAPI.createRecurringAvailability(assetId, form)
+      loadRules()
+    } catch (err: any) {
+      setError(err?.response?.data?.detail ?? 'Failed to add recurring block')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <button onClick={toggle} className="flex items-center gap-1.5 text-xs text-navy font-medium hover:underline">
+        <Repeat size={12} /> Recurring availability
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+          <ChevronDown size={12} />
+        </motion.span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="mt-3 space-y-2">
+              {loading ? (
+                <p className="text-xs text-gray-400">Loading…</p>
+              ) : rules.length === 0 ? (
+                <p className="text-xs text-gray-400">No standing blocks yet.</p>
+              ) : (
+                rules.map((r) => (
+                  <div key={r.id} className="text-xs bg-gray-50 rounded-lg px-2.5 py-1.5">
+                    Every {WEEKDAYS[r.day_of_week]}, {r.start_time}–{r.end_time}
+                  </div>
+                ))
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <select value={form.day_of_week}
+                  onChange={(e) => setForm((p) => ({ ...p, day_of_week: parseInt(e.target.value) }))}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
+                  {WEEKDAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                </select>
+                <input type="time" value={form.start_time}
+                  onChange={(e) => setForm((p) => ({ ...p, start_time: e.target.value }))}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs" />
+                <span className="text-xs text-gray-400">to</span>
+                <input type="time" value={form.end_time}
+                  onChange={(e) => setForm((p) => ({ ...p, end_time: e.target.value }))}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs" />
+                <button onClick={addRule} disabled={saving}
+                  className="text-xs bg-navy text-white px-3 py-1 rounded-lg font-medium disabled:opacity-50 flex items-center gap-1">
+                  {saving && <Loader2 size={10} className="animate-spin" />} Add block
+                </button>
+              </div>
+              {error && <p className="text-xs text-red-500">{error}</p>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 const CATEGORIES = [
   { value: 'banquet_hall',      label: '🏛️ Banquet Hall' },
@@ -56,13 +148,17 @@ export default function ProviderPortal() {
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }))
 
-  // Load own listings
+  // Load own listings. Depends on user?.id too: the auth session restores
+  // asynchronously, so `user` is still null on first mount — without this
+  // dependency, the filter below would run once against a stale null user
+  // and never re-run once the real user loads.
   useEffect(() => {
+    if (!user?.id) return
     listingsAPI.list().then((res) => {
-      const mine = res.data.filter((l) => l.owner_id === user?.id)
+      const mine = res.data.filter((l) => l.owner_id === user.id)
       setListings(mine)
     }).finally(() => setLoadingList(false))
-  }, [success])
+  }, [success, user?.id])
 
   // Laya description safety check (debounced)
   useEffect(() => {
@@ -261,15 +357,18 @@ export default function ProviderPortal() {
           <div className="space-y-3">
             {listings.map((l, i) => (
               <motion.div key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
-                className="bg-white rounded-2xl border border-lavender/20 shadow-sm p-5 flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{l.title}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">{l.category} · {l.address}</p>
+                className="bg-white rounded-2xl border border-lavender/20 shadow-sm p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{l.title}</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">{l.category} · {l.address}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-bold text-navy">₹{l.price_per_day.toLocaleString('en-IN')}/day</div>
+                    <span className="text-xs text-green-600 font-medium">Active</span>
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="font-bold text-navy">₹{l.price_per_day.toLocaleString('en-IN')}/day</div>
-                  <span className="text-xs text-green-600 font-medium">Active</span>
-                </div>
+                <RecurringAvailabilityControl assetId={l.id} />
               </motion.div>
             ))}
           </div>

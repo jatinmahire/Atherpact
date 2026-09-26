@@ -32,6 +32,13 @@ async def lifespan(app: FastAPI):
     from services.matcher import get_model
     get_model()  # loads once; subsequent calls hit the module-level cache
 
+    logger.info("Building vector index (Phase 12)…")
+    from services import vector_index
+    from database import Asset
+    with SessionLocal() as db:
+        active_assets = db.query(Asset).filter(Asset.is_active == True).all()
+        vector_index.rebuild(active_assets)
+
     logger.info("Attempting to pre-load Laya…")
     from services.laya_service import _get_laya
     _get_laya()

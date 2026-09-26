@@ -79,6 +79,23 @@ class AvailabilityWindow(Base):
     )
 
 
+class RecurringAvailabilityRule(Base):
+    """
+    Phase 12 (Addendum 2): a standing weekly block for an asset, e.g. "every
+    Tuesday, 14:00 to 18:00" (maintenance, an existing standing reservation,
+    etc). A one-off booking request that overlaps a generated occurrence of
+    this rule is rejected, the same as an overlap with a literal Booking row.
+    """
+    __tablename__ = "recurring_availability_rules"
+    id                  = Column(String, primary_key=True)
+    asset_id            = Column(String, ForeignKey("assets.id"), nullable=False)
+    day_of_week         = Column(Integer, nullable=False)  # 0=Monday ... 6=Sunday (Python's date.weekday())
+    start_time          = Column(String, nullable=False)   # "HH:MM", 24h
+    end_time            = Column(String, nullable=False)   # "HH:MM", 24h
+    recurrence_end_date = Column(DateTime, nullable=True)  # None = recurs indefinitely
+    created_at          = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class Requirement(Base):
     """A seeker's posted resource need."""
     __tablename__ = "requirements"
