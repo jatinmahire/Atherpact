@@ -69,7 +69,7 @@ function ReviewForm({ bookingId }: { bookingId: string }) {
         className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-navy resize-none mb-2" />
       {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
       <button onClick={submit} disabled={score < 1 || submitting}
-        className="bg-navy text-white px-4 py-2 rounded-xl font-semibold text-sm disabled:opacity-40 flex items-center gap-2 hover:bg-navy-light transition-colors">
+        className="bg-navy text-espresso px-4 py-2 rounded-xl font-semibold text-sm disabled:opacity-40 flex items-center gap-2 hover:bg-navy-light transition-colors">
         {submitting && <Loader2 size={14} className="animate-spin" />} Submit Review
       </button>
     </div>
@@ -224,7 +224,7 @@ export default function AuditPage() {
           {user ? (
             <button onClick={() => { authStore.logout(); nav('/') }} className="text-sm text-navy hover:underline">Sign out</button>
           ) : (
-            <button onClick={() => nav('/login')} className="text-sm bg-navy text-white px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors">Sign In</button>
+            <button onClick={() => nav('/login')} className="text-sm bg-navy text-espresso px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors">Sign In</button>
           )}
         </div>
       </nav>
@@ -326,7 +326,7 @@ export default function AuditPage() {
                 )}
                 {checkinFile && !checkinDone && (
                   <button onClick={handleCheckin} disabled={uploading}
-                    className="mt-3 w-full bg-navy text-white py-2 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
+                    className="mt-3 w-full bg-navy text-espresso py-2 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
                     {uploading && <Loader2 size={14} className="animate-spin" />}
                     Submit Check-in
                   </button>
@@ -366,7 +366,7 @@ export default function AuditPage() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={capturePhoto}
-                        className="flex-1 bg-navy text-white py-2 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
+                        className="flex-1 bg-navy text-espresso py-2 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
                         <Camera size={14} /> Capture
                       </button>
                       <button onClick={stopCamera}
@@ -397,7 +397,7 @@ export default function AuditPage() {
                 )}
                 {checkoutFile && !auditResult && checkinDone && (
                   <button onClick={handleCheckout} disabled={uploading}
-                    className="mt-3 w-full bg-navy text-white py-2 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
+                    className="mt-3 w-full bg-navy text-espresso py-2 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
                     {uploading && <Loader2 size={14} className="animate-spin" />}
                     Run Visual Comparison
                   </button>

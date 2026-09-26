@@ -88,7 +88,7 @@ export default function Contact() {
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-navy resize-none" />
                 {error && <p className="text-xs text-red-500">{error}</p>}
                 <button type="submit" disabled={submitting}
-                  className="bg-navy text-white px-5 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center gap-2 hover:bg-navy-light transition-colors">
+                  className="bg-navy text-espresso px-5 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center gap-2 hover:bg-navy-light transition-colors">
                   {submitting && <Loader2 size={14} className="animate-spin" />} Send Message
                 </button>
               </form>

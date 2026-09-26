@@ -11,6 +11,7 @@ import { negotiateAPI, bookingsAPI } from '../api/client'
 import type { MatchResultItem, NegotiateResponse, SmartSuggestion } from '../api/client'
 import { openRazorpayCheckout } from '../lib/razorpay'
 import { authStore } from '../store/auth'
+import { useCountUp } from '../hooks/useCountUp'
 
 type PaymentState = 'idle' | 'creating_booking' | 'creating_order' | 'awaiting_payment' | 'verifying' | 'paid' | 'failed'
 
@@ -55,6 +56,55 @@ function defaultBookingWindow() {
   const ends = new Date(starts.getTime() + 24 * 60 * 60 * 1000)
   ends.setHours(18, 0, 0, 0)
   return { starts_at: toDatetimeLocalValue(starts), ends_at: toDatetimeLocalValue(ends) }
+}
+
+/** Signature animation (Addendum 7, Phase 52): the provider's ask and the
+ * seeker's offer — real numbers from the form that was just submitted —
+ * slide toward each other along a shared track until they meet exactly at
+ * the real clearing price, then the price counts up. Plays once, only
+ * because a real settled result just arrived. */
+function AgreementConverge({
+  providerAsk, providerMin, seekerOffer, seekerMax, clearingPrice,
+}: { providerAsk: number; providerMin: number; seekerOffer: number; seekerMax: number; clearingPrice: number }) {
+  const [priceRevealed, setPriceRevealed] = useState(false)
+  const countedPrice = useCountUp(Math.round(clearingPrice), priceRevealed, 600)
+
+  const domainMin = Math.min(providerMin, seekerOffer, clearingPrice) * 0.95
+  const domainMax = Math.max(providerAsk, seekerMax, clearingPrice) * 1.05
+  const pct = (v: number) => `${((v - domainMin) / (domainMax - domainMin)) * 100}%`
+
+  return (
+    <div>
+      <div className="relative h-8 mb-3">
+        <div className="absolute top-1/2 left-0 right-0 h-1 -translate-y-1/2 bg-gray-100 rounded-full" />
+        {/* Provider's ask, starts at its real value, slides to the clearing price */}
+        <motion.div
+          initial={{ left: pct(providerAsk) }}
+          animate={{ left: pct(clearingPrice) }}
+          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          onAnimationComplete={() => setPriceRevealed(true)}
+          className="absolute top-0 -translate-x-1/2 flex flex-col items-center"
+        >
+          <span className="text-[9px] text-wine font-medium mb-0.5">Provider</span>
+          <div className="w-3 h-3 rounded-full bg-wine border-2 border-white shadow" />
+        </motion.div>
+        {/* Seeker's offer, same real convergence */}
+        <motion.div
+          initial={{ left: pct(seekerOffer) }}
+          animate={{ left: pct(clearingPrice) }}
+          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          className="absolute bottom-0 -translate-x-1/2 flex flex-col items-center"
+        >
+          <div className="w-3 h-3 rounded-full bg-sage border-2 border-white shadow" />
+          <span className="text-[9px] text-sage font-medium mt-0.5">Seeker</span>
+        </motion.div>
+      </div>
+      <div className="text-4xl font-bold text-navy mt-1">
+        ₹{countedPrice.toLocaleString('en-IN')}
+        <span className="text-lg font-normal text-gray-400">/day</span>
+      </div>
+    </div>
+  )
 }
 
 export default function NegotiatePage({ item, onClose }: Props) {
@@ -130,7 +180,7 @@ export default function NegotiatePage({ item, onClose }: Props) {
         exit={{ scale: 0.92, y: 20 }}
         className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
       >
-        <div className="bg-navy text-white px-6 py-4">
+        <div className="bg-navy text-espresso px-6 py-4">
           <h2 className="font-bold text-lg">Negotiate — {asset.title}</h2>
           <p className="text-white/70 text-sm mt-0.5">ZOPA solver computes the clearing price from pure arithmetic</p>
         </div>
@@ -147,7 +197,7 @@ export default function NegotiatePage({ item, onClose }: Props) {
                     <p className="text-gray-400 mt-0.5">{smartSuggestion.reason}</p>
                   </div>
                   <button type="button" onClick={applySmartSuggestion}
-                    className="text-xs bg-navy text-white px-2.5 py-1 rounded-lg font-medium shrink-0 hover:bg-navy-light transition-colors">
+                    className="text-xs bg-navy text-espresso px-2.5 py-1 rounded-lg font-medium shrink-0 hover:bg-navy-light transition-colors">
                     Use this
                   </button>
                 </div>
@@ -204,7 +254,7 @@ export default function NegotiatePage({ item, onClose }: Props) {
 
               <div className="flex gap-3">
                 <button type="submit" disabled={loading}
-                  className="flex-1 bg-navy text-white py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
+                  className="flex-1 bg-navy text-espresso py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-navy-light transition-colors">
                   {loading && <Loader2 size={14} className="animate-spin" />}
                   Compute Clearing Price
                 </button>
@@ -226,10 +276,20 @@ export default function NegotiatePage({ item, onClose }: Props) {
                         <span className="font-bold text-gray-900">Deal Settled</span>
                         <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Deterministic ZOPA</span>
                       </div>
-                      <div className="text-4xl font-bold text-navy mt-3">
-                        ₹{result.clearing_price?.toLocaleString('en-IN')}
-                        <span className="text-lg font-normal text-gray-400">/day</span>
-                      </div>
+
+                      {/* Signature animation (Addendum 7, Phase 52): the
+                          provider's and seeker's ranges slide toward each
+                          other until they meet at the real clearing price,
+                          then it counts up from 0 — triggered exactly once,
+                          only because a real settled result just arrived. */}
+                      <AgreementConverge
+                        providerAsk={parseFloat(form.provider_ask)}
+                        providerMin={parseFloat(form.provider_min)}
+                        seekerOffer={parseFloat(form.seeker_offer)}
+                        seekerMax={parseFloat(form.seeker_max)}
+                        clearingPrice={result.clearing_price ?? 0}
+                      />
+
                       <p className="text-xs text-gray-400 mt-2">
                         Computed as: (max(provider_min, seeker_offer) + min(provider_ask, seeker_max)) / 2
                       </p>
@@ -271,10 +331,30 @@ export default function NegotiatePage({ item, onClose }: Props) {
 
                     {/* ── BOOKING + PAYMENT ACTION (Phase 38, Addendum 4) ── */}
                     {paymentState === 'paid' ? (
-                      <div className="mt-4 bg-green-50 text-green-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
-                        <CheckCircle2 size={16} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="mt-4 bg-green-50 text-green-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2"
+                      >
+                        {/* Signature animation (Addendum 7, Phase 52): the
+                            checkmark draws itself in the moment server-side
+                            payment verification actually succeeds. */}
+                        <svg width="20" height="20" viewBox="0 0 24 24" className="shrink-0">
+                          <motion.circle
+                            cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.5"
+                            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }}
+                            transition={{ duration: 0.35, ease: 'easeOut' }}
+                          />
+                          <motion.path
+                            d="M7 12.5l3 3 7-7" fill="none" stroke="currentColor" strokeWidth="2"
+                            strokeLinecap="round" strokeLinejoin="round"
+                            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }}
+                            transition={{ duration: 0.3, delay: 0.3, ease: 'easeOut' }}
+                          />
+                        </svg>
                         Booking confirmed &amp; paid{paidAmount != null ? ` (₹${paidAmount.toLocaleString('en-IN')})` : ''} — verified by Razorpay. You can now run visual verification.
-                      </div>
+                      </motion.div>
                     ) : (
                       <button
                         onClick={async () => {

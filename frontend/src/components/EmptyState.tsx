@@ -21,7 +21,7 @@ export default function EmptyState({ icon, title, suggestions, ctaLabel, onCta }
       )}
       {ctaLabel && onCta && (
         <button onClick={onCta}
-          className="mt-4 text-sm bg-navy text-white px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors">
+          className="mt-4 text-sm bg-navy text-espresso px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors">
           {ctaLabel}
         </button>
       )}

@@ -58,7 +58,7 @@ function ListingBrowseCard({ listing, rank, onNegotiate }: { listing: Listing; r
       {onNegotiate && (
         <div className="mt-4 flex justify-end">
           <button onClick={onNegotiate}
-            className="text-xs bg-navy text-white px-4 py-1.5 rounded-full font-medium hover:bg-navy-light transition-colors">
+            className="text-xs bg-navy text-espresso px-4 py-1.5 rounded-full font-medium hover:bg-navy-light transition-colors">
             Negotiate
           </button>
         </div>
@@ -168,7 +168,7 @@ export default function SeekerPortal() {
           {user ? (
             <button onClick={() => { authStore.logout(); nav('/') }} className="text-sm text-navy hover:underline">Sign out</button>
           ) : (
-            <button onClick={() => nav('/login')} className="text-sm bg-navy text-white px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors">Sign In</button>
+            <button onClick={() => nav('/login')} className="text-sm bg-navy text-espresso px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors">Sign In</button>
           )}
         </div>
       </nav>
@@ -214,7 +214,7 @@ export default function SeekerPortal() {
               {geoStatus === 'locating' ? <Loader2 size={14} className="animate-spin" /> : <LocateFixed size={14} />}
             </button>
             <button type="submit" disabled={loading || !query.trim()}
-              className="bg-navy text-white px-6 py-3 rounded-xl font-semibold text-sm disabled:opacity-40 flex items-center gap-2 hover:bg-navy-light transition-colors shrink-0">
+              className="bg-navy text-espresso px-6 py-3 rounded-xl font-semibold text-sm disabled:opacity-40 flex items-center gap-2 hover:bg-navy-light transition-colors shrink-0">
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
               Search
             </button>

@@ -1,13 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy: #1E3A73;
-  --color-lavender: #C7CEEA;
-  --color-navy-light: #2F52A0;
-  --color-navy-dark: #16294F;
+  /* Addendum 7: site-wide migration off the old navy/lavender palette.
+     Redefining these token VALUES (rather than renaming every className
+     across ~20 files) cascades the new brand color to every existing
+     bg-navy/text-navy/border-navy/bg-lavender usage site-wide in one
+     place — the old hex values (#1E3A73/#C7CEEA) no longer appear
+     anywhere in a rendered page. */
+  --color-navy: #B8925A;       /* was #1E3A73 — now brass, same dual role
+                                   (primary accent + CTA background) the
+                                   brief specifies for brass */
+  --color-navy-light: #C9A472; /* hover/lighter state */
+  --color-navy-dark: #8F6D3F;  /* pressed/darker state */
+  --color-lavender: #D9C7A8;   /* was #C7CEEA — warm tan, used at low
+                                   opacity for soft card tints/borders */
 
-  /* Landing page design brief tokens (scoped to Landing.tsx only — no
-     other page references these, so nothing else changes). */
+  /* Landing page design brief tokens — now used site-wide too. */
   --color-espresso: #161310;
   --color-stone: #F3EEE4;
   --color-brass: #B8925A;
@@ -15,6 +23,24 @@
   --color-sage: #4F7A5B;
   --color-ink: #211D18;
   --color-warm-white: #F3EFE6;
+
+  /* Addendum 7: Tailwind's built-in gray/slate scale is used pervasively
+     for body text, borders, and muted labels across every page — this is
+     the single highest-leverage override in this migration. Warming
+     these means nearly every existing page re-themes correctly without
+     per-file edits. Loading skeletons (bg-gray-100/200 + animate-pulse)
+     shimmer in these warm stone tones as a direct result, not grey. */
+  --color-gray-50:  #F8F4EC;
+  --color-gray-100: #F0E9DB;
+  --color-gray-200: #E4DAC5;
+  --color-gray-300: #CDBDA0;
+  --color-gray-400: #A6957A;
+  --color-gray-500: #877A61;
+  --color-gray-600: #4A4236;
+  --color-gray-700: #332D22;
+  --color-gray-800: #271F17;
+  --color-gray-900: #211D18;
+  --color-slate-50: #F3EEE4;
 }
 
 * {
@@ -22,9 +48,16 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: #fafbff;
-  color: #1a1a2e;
+  font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+  background: #F3EEE4;
+  color: #211D18;
+}
+
+/* Addendum 7: Fraunces for every heading site-wide, Archivo for
+   everything else — the brief's "two families only" rule applied
+   globally rather than per-page. */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Fraunces', Georgia, serif;
 }
 
 /* Smooth scrolling */
@@ -32,8 +65,9 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Landing page design brief: two type families, scoped via these classes
-   only — no other page uses them, so nothing else changes. */
+/* Kept for explicit opt-in use (e.g. Landing's hero, which sets these on
+   non-heading elements too); redundant with the global body/heading rules
+   above for most cases, harmless where still referenced. */
 .font-display { font-family: 'Fraunces', Georgia, serif; }
 .font-body { font-family: 'Archivo', system-ui, sans-serif; }
 
@@ -42,11 +76,22 @@ html {
   to   { transform: scale(1.06); }
 }
 
-/* Glass Surface Treatment (Addendum 7, Section 0.5) — scoped to Landing.tsx
-   only for now (hero card + landing navbar). Fallback-first: the base rule
-   is a plain solid-ish translucent panel (works everywhere, including
-   browsers without backdrop-filter); the blur is layered on top only
-   inside an @supports block, per the brief's required graceful fallback. */
+/* Micro-interactions (Addendum 7, Phase 53): a small, consistent tactile
+   press on every primary/secondary button site-wide. */
+button:not(:disabled) {
+  transition: transform 150ms ease, opacity 150ms ease, background-color 150ms ease;
+}
+button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* Glass Surface Treatment (Addendum 7, Section 0.5) — used on the landing
+   hero card + navbar, and on Modal/ConfirmDialog/ChatWidget (elements that
+   float above a dimmed or moving view of the page). Fallback-first: the
+   base rule is a plain solid-ish translucent panel (works everywhere,
+   including browsers without backdrop-filter); the blur is layered on
+   top only inside an @supports block, per the brief's required graceful
+   fallback. */
 .glass-surface {
   background: rgba(22, 19, 16, 0.55); /* solid-ish fallback, no blur */
   border: 1px solid rgba(243, 239, 230, 0.22);
@@ -65,7 +110,7 @@ html {
 }
 
 /* Variant for a glass surface floating over the light stone section
-   instead of the dark hero photo — darker base/border per the spec. */
+   instead of a dark photo — darker base/border per the spec. */
 .glass-surface--on-stone {
   background: rgba(22, 19, 16, 0.55);
   border: 1px solid rgba(22, 19, 16, 0.18);
@@ -83,8 +128,8 @@ html {
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — brass, matching the new system */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #f1f3f9; }
-::-webkit-scrollbar-thumb { background: #C7CEEA; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3A4876; }
+::-webkit-scrollbar-track { background: #F0E9DB; }
+::-webkit-scrollbar-thumb { background: #D9C7A8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #B8925A; }

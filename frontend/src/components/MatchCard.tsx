@@ -59,7 +59,9 @@ export default function MatchCard({ item, rank, onNegotiate }: Props) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: rank * 0.08, duration: 0.4 }}
-      className="bg-white rounded-2xl shadow-sm border border-lavender/30 overflow-hidden hover:shadow-md transition-shadow"
+      whileHover={{ y: -3 }}
+      className="bg-white rounded-2xl shadow-sm border border-lavender/30 overflow-hidden hover:shadow-lg transition-shadow"
+      style={{ transitionDuration: '200ms' }}
     >
       {/* Header */}
       <div className="p-5">
@@ -117,7 +119,7 @@ export default function MatchCard({ item, rank, onNegotiate }: Props) {
           {onNegotiate && (
             <button
               onClick={() => onNegotiate(item)}
-              className="ml-auto text-xs bg-navy text-white px-4 py-1.5 rounded-full font-medium hover:bg-navy-light transition-colors"
+              className="ml-auto text-xs bg-navy text-espresso px-4 py-1.5 rounded-full font-medium hover:bg-navy-light transition-colors"
             >
               Negotiate
             </button>

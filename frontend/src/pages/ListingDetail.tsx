@@ -197,7 +197,7 @@ export default function ListingDetail() {
             onClick={() => user
               ? setNegotiating({ asset: listing, scores: matchScores ?? { semantic_score: 0, price_score: 0, distance_score: 0, final_score: 0 } })
               : nav('/login')}
-            className="mt-4 w-full bg-navy text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-navy-light transition-colors"
+            className="mt-4 w-full bg-navy text-espresso py-2.5 rounded-xl font-semibold text-sm hover:bg-navy-light transition-colors"
           >
             Negotiate & Book
           </button>

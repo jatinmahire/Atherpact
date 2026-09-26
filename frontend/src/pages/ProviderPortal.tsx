@@ -10,8 +10,17 @@ import { listingsAPI, analyticsAPI, authAPI, bookingsAPI, listingImageUrl } from
 import type { Listing, RecurringAvailabilityRule, AvailabilityWindow, ProviderAnalytics, ReferralStatus, ProviderBookingItem } from '../api/client'
 import { authStore } from '../store/auth'
 import { useNavigate } from 'react-router-dom'
+import { useCountUp } from '../hooks/useCountUp'
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+/** Addendum 7, Phase 53: a dashboard number counts up once the real value
+ * from the backend arrives — never on a fixed timer, and re-triggers
+ * cleanly whenever the real value itself changes. */
+function AnimatedStatNumber({ value }: { value: number }) {
+  const counted = useCountUp(value, true, 600)
+  return <>{counted}</>
+}
 
 /** Phase 12 (Addendum 2): provider-facing control for a standing weekly
  * block, e.g. "every Tuesday, 14:00 to 18:00", instead of manually entering
@@ -90,7 +99,7 @@ function RecurringAvailabilityControl({ assetId }: { assetId: string }) {
                   onChange={(e) => setForm((p) => ({ ...p, end_time: e.target.value }))}
                   className="border border-gray-200 rounded-lg px-2 py-1 text-xs" />
                 <button onClick={addRule} disabled={saving}
-                  className="text-xs bg-navy text-white px-3 py-1 rounded-lg font-medium disabled:opacity-50 flex items-center gap-1">
+                  className="text-xs bg-navy text-espresso px-3 py-1 rounded-lg font-medium disabled:opacity-50 flex items-center gap-1">
                   {saving && <Loader2 size={10} className="animate-spin" />} Add block
                 </button>
               </div>
@@ -180,7 +189,7 @@ function AvailabilityWindowControl({ assetId }: { assetId: string }) {
                   onChange={(e) => setForm((p) => ({ ...p, ends_at: e.target.value }))}
                   className="border border-gray-200 rounded-lg px-2 py-1 text-xs" />
                 <button onClick={addWindow} disabled={saving}
-                  className="text-xs bg-navy text-white px-3 py-1 rounded-lg font-medium disabled:opacity-50 flex items-center gap-1">
+                  className="text-xs bg-navy text-espresso px-3 py-1 rounded-lg font-medium disabled:opacity-50 flex items-center gap-1">
                   {saving && <Loader2 size={10} className="animate-spin" />} Add window
                 </button>
               </div>
@@ -401,27 +410,30 @@ export default function ProviderPortal() {
         {/* Revenue summary + real dashboard analytics (completed bookings, avg rating) */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Active Listings', value: listings.length, icon: <CheckCircle size={18} className="text-green-500" /> },
-            { label: 'Combined Daily Rate', value: `₹${totalRevenue.toLocaleString('en-IN')}`, icon: <TrendingUp size={18} className="text-navy" /> },
-            { label: 'Completed Bookings', value: analytics?.completed_bookings ?? '—', icon: <CalendarCheck size={18} className="text-navy" /> },
+            { label: 'Active Listings', value: listings.length, icon: <CheckCircle size={18} className="text-green-500" />, countUp: true },
+            { label: 'Combined Daily Rate', value: `₹${totalRevenue.toLocaleString('en-IN')}`, icon: <TrendingUp size={18} className="text-navy" />, countUp: false },
+            { label: 'Completed Bookings', value: analytics?.completed_bookings ?? '—', icon: <CalendarCheck size={18} className="text-navy" />, countUp: typeof analytics?.completed_bookings === 'number' },
             {
               label: analytics?.total_reviews ? `Avg Rating (${analytics.total_reviews})` : 'Avg Rating',
               value: analytics?.average_rating != null ? analytics.average_rating.toFixed(1) : 'No reviews yet',
               icon: <Star size={18} className="text-amber-400" />,
+              countUp: false,
             },
           ].map((s, i) => (
             <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.1 }}
               className="bg-white rounded-2xl p-5 border border-lavender/20 shadow-sm flex items-center gap-3">
               {s.icon}
               <div>
-                <div className="text-lg font-bold text-gray-900">{s.value}</div>
+                <div className="text-lg font-bold text-gray-900">
+                  {s.countUp && typeof s.value === 'number' ? <AnimatedStatNumber value={s.value} /> : s.value}
+                </div>
                 <div className="text-xs text-gray-500">{s.label}</div>
               </div>
             </motion.div>
           ))}
           <motion.button
             onClick={() => setShowForm(!showForm)}
-            className="bg-navy text-white rounded-2xl p-5 flex items-center gap-2 font-semibold hover:bg-navy-light transition-colors shadow-sm"
+            className="bg-navy text-espresso rounded-2xl p-5 flex items-center gap-2 font-semibold hover:bg-navy-light transition-colors shadow-sm"
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
           >
             <Plus size={20} /> Add Listing
@@ -571,7 +583,7 @@ export default function ProviderPortal() {
 
                 <div className="flex gap-3 pt-2">
                   <button type="submit" disabled={submitting}
-                    className="bg-navy text-white px-6 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center gap-2 hover:bg-navy-light transition-colors">
+                    className="bg-navy text-espresso px-6 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center gap-2 hover:bg-navy-light transition-colors">
                     {submitting && <Loader2 size={14} className="animate-spin" />}
                     Publish Listing
                   </button>

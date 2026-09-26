@@ -92,7 +92,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-navy text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-navy-light transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-navy text-espresso py-2.5 rounded-xl font-semibold text-sm hover:bg-navy-light transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader2 size={16} className="animate-spin" />}
             Sign In

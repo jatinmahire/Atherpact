@@ -65,7 +65,7 @@ export default function Navbar() {
           <>
             <button onClick={() => nav('/login')} className="text-sm text-navy font-medium hover:underline">Sign in</button>
             <button onClick={() => nav('/register')}
-              className="text-sm bg-navy text-white px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors">
+              className="text-sm bg-navy text-espresso px-4 py-2 rounded-full font-medium hover:bg-navy-light transition-colors">
               List a Resource
             </button>
           </>

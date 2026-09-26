@@ -19,16 +19,13 @@ import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
-import '@fontsource/fraunces/400.css'
-import '@fontsource/fraunces/600.css'
-import '@fontsource/archivo/400.css'
-import '@fontsource/archivo/500.css'
-import '@fontsource/archivo/700.css'
+// Fraunces/Archivo are now loaded globally from main.tsx (Addendum 7).
 import ChatWidget from '../components/ChatWidget'
 import SystemStatus from '../components/SystemStatus'
 import { authStore } from '../store/auth'
 import { matchAPI } from '../api/client'
 import type { MatchResultItem } from '../api/client'
+import { useCountUp } from '../hooks/useCountUp'
 
 const HeroScene = lazy(() => import('../components/HeroScene'))
 
@@ -57,25 +54,6 @@ const WHY = [
   { title: 'Offline-first AI', desc: 'Every model runs locally on one machine — no cloud AI call in the matching or negotiation path.' },
 ]
 
-/** Counts up from 0 to `value` over ~900ms once triggered — used only for
- * the hero card's real match percentage, per the brief's one animation. */
-function useCountUp(value: number, start: boolean) {
-  const [display, setDisplay] = useState(0)
-  useEffect(() => {
-    if (!start) return
-    const duration = 900
-    const startTime = performance.now()
-    let raf: number
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - startTime) / duration)
-      setDisplay(Math.round(progress * value))
-      if (progress < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [value, start])
-  return display
-}
 
 function FloatingResourceCard({ item }: { item: MatchResultItem | null }) {
   const [cardShown, setCardShown] = useState(false)

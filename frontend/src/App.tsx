@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { authStore } from './store/auth'
 
 import Landing        from './pages/Landing'
@@ -22,21 +22,33 @@ function AnimatedRoutes() {
   const location = useLocation()
   return (
     <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/"             element={<Landing />} />
-        <Route path="/login"        element={<Login />} />
-        <Route path="/register"     element={<Register />} />
-        <Route path="/provider"     element={<ProviderPortal />} />
-        {/* /explore is the addendum's canonical route; /seeker kept as an
-            alias so existing links/buttons built earlier don't break. */}
-        <Route path="/explore"      element={<SeekerPortal />} />
-        <Route path="/seeker"       element={<SeekerPortal />} />
-        <Route path="/listing/:id"  element={<ListingDetail />} />
-        <Route path="/audit"        element={<AuditPage />} />
-        <Route path="/how-it-works" element={<HowItWorks />} />
-        <Route path="/about"        element={<About />} />
-        <Route path="/contact"      element={<Contact />} />
-      </Routes>
+      {/* Addendum 7, Phase 53: one consistent cross-fade between every
+          route. AnimatePresence only animates a direct motion child's
+          exit — previously it wrapped plain <Routes>, so no page here
+          ever actually had an exit transition despite the comment above. */}
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: 'easeInOut' }}
+      >
+        <Routes location={location}>
+          <Route path="/"             element={<Landing />} />
+          <Route path="/login"        element={<Login />} />
+          <Route path="/register"     element={<Register />} />
+          <Route path="/provider"     element={<ProviderPortal />} />
+          {/* /explore is the addendum's canonical route; /seeker kept as an
+              alias so existing links/buttons built earlier don't break. */}
+          <Route path="/explore"      element={<SeekerPortal />} />
+          <Route path="/seeker"       element={<SeekerPortal />} />
+          <Route path="/listing/:id"  element={<ListingDetail />} />
+          <Route path="/audit"        element={<AuditPage />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/about"        element={<About />} />
+          <Route path="/contact"      element={<Contact />} />
+        </Routes>
+      </motion.div>
     </AnimatePresence>
   )
 }
