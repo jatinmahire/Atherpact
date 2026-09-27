@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Loader2, MapPin, LocateFixed, CloudRain, Check } from 'lucide-react'
 import { matchAPI, listingsAPI, weatherTwinAPI, bookingsAPI, listingImageUrl } from '../api/client'
@@ -151,6 +151,7 @@ type SortOption = 'best_match' | 'price_asc' | 'price_desc'
 
 export default function SeekerPortal() {
   const nav  = useNavigate()
+  const location = useLocation()
   const user = authStore.getUser()
 
   useEffect(() => {
@@ -171,6 +172,14 @@ export default function SeekerPortal() {
     if (!user?.id) return
     bookingsAPI.list().then((res) => setMyBookings(res.data)).catch(() => {})
   }, [user?.id])
+
+  // Arrived here via the Landing page's "My Bookings" button — scroll to
+  // the section once it's actually rendered.
+  useEffect(() => {
+    if ((location.state as { scrollToBookings?: boolean } | null)?.scrollToBookings) {
+      setTimeout(() => document.getElementById('my-bookings')?.scrollIntoView({ behavior: 'smooth' }), 300)
+    }
+  }, [location.state])
 
   const [query, setQuery]       = useState('')
   const [budget, setBudget]     = useState('')

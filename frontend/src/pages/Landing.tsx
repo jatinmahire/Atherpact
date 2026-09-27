@@ -314,6 +314,14 @@ export default function Landing() {
               >
                 Find a Resource <ArrowRight size={18} />
               </button>
+              {user && user.role !== 'provider' && (
+                <button
+                  onClick={() => nav('/explore', { state: { scrollToBookings: true } })}
+                  className="border border-warm-white/40 text-warm-white px-6 py-3 rounded-full font-semibold hover:bg-warm-white/10 transition-colors"
+                >
+                  My Bookings
+                </button>
+              )}
               {user?.role !== 'seeker' && (
                 <button
                   onClick={() => nav('/provider')}
@@ -409,6 +417,11 @@ export default function Landing() {
               <button onClick={() => nav('/seeker')} className="bg-brass text-espresso px-6 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity">
                 Find a Resource
               </button>
+              {user && user.role !== 'provider' && (
+                <button onClick={() => nav('/explore', { state: { scrollToBookings: true } })} className="border border-warm-white/40 text-warm-white px-6 py-3 rounded-full font-semibold hover:bg-warm-white/10 transition-colors">
+                  My Bookings
+                </button>
+              )}
               {user?.role !== 'seeker' && (
                 <button onClick={() => nav('/provider')} className="border border-warm-white/40 text-warm-white px-6 py-3 rounded-full font-semibold hover:bg-warm-white/10 transition-colors">
                   List Your Resource
