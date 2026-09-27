@@ -245,8 +245,13 @@ export default function ProviderPortal() {
     // Phase 37 (Addendum 4): must wait for Firebase to report the session at
     // least once — otherwise a real session briefly looks logged-out during
     // the async restore and this redirects a valid user to /login.
+    // Phase 83: a seeker-only account has no provider portal to see — send
+    // them to their own portal instead of leaving the provider dashboard
+    // reachable by direct URL. 'both' and 'provider' roles are unaffected.
     const check = () => {
-      if (authStore.isReady() && !authStore.isAuthenticated()) nav('/login')
+      if (!authStore.isReady()) return
+      if (!authStore.isAuthenticated()) { nav('/login'); return }
+      if (authStore.getUser()?.role === 'seeker') nav('/explore')
     }
     check()
     return authStore.subscribe(check)
@@ -267,7 +272,7 @@ export default function ProviderPortal() {
 
   const [form, setForm] = useState({
     title: '', description: '', category: 'banquet_hall',
-    price_per_day: '', address: '', capacity: '', maps_link: '',
+    price_per_day: '', address: '', capacity: '', maps_link: '', owner_display_name: '',
   })
   // Addendum 5: a real photo is required for every new listing.
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -370,11 +375,12 @@ export default function ProviderPortal() {
         // A pasted maps link takes priority server-side; geolocation is the fallback.
         ...(form.maps_link.trim() ? { maps_link: form.maps_link.trim() } : {}),
         ...(geoCoords ? { lat: geoCoords.lat, lon: geoCoords.lon } : {}),
+        ...(form.owner_display_name.trim() ? { owner_display_name: form.owner_display_name.trim() } : {}),
       })
       await listingsAPI.uploadImage(created.data.id, photoFile)
       setSuccess(true)
       setShowForm(false)
-      setForm({ title: '', description: '', category: 'banquet_hall', price_per_day: '', address: '', capacity: '', maps_link: '' })
+      setForm({ title: '', description: '', category: 'banquet_hall', price_per_day: '', address: '', capacity: '', maps_link: '', owner_display_name: '' })
       setGeoCoords(null)
       setGeoStatus('idle')
       setSafetyNote(null)
@@ -400,7 +406,9 @@ export default function ProviderPortal() {
           <span className="font-bold text-navy text-xl">Provider Portal</span>
         </div>
         <div className="flex gap-4 items-center">
-          <button onClick={() => nav('/seeker')} className="text-sm text-navy font-medium hover:underline">Find Resources</button>
+          {user?.role === 'both' && (
+            <button onClick={() => nav('/seeker')} className="text-sm text-navy font-medium hover:underline">Find Resources</button>
+          )}
           <button onClick={() => nav('/audit')} className="text-sm text-navy font-medium hover:underline">Visual Audit</button>
           <span className="text-gray-300">|</span>
           {user && <span className="text-sm font-semibold text-navy bg-navy/10 px-3 py-1.5 rounded-full">{user.display_name}</span>}
@@ -580,6 +588,14 @@ export default function ProviderPortal() {
                     <input type="number" value={form.capacity} onChange={update('capacity')}
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
                       placeholder="e.g. 200" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      On-Site Contact Name <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <input value={form.owner_display_name} onChange={update('owner_display_name')}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
+                      placeholder="Leave blank to use your account name" />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -45,6 +45,7 @@ export interface User {
   email: string
   display_name: string
   role: string
+  contact_phone: string | null
   created_at: string
   verified_at: string | null
   referral_code: string | null
@@ -64,6 +65,7 @@ export interface Listing {
   address: string
   capacity: number | null
   image_path: string | null
+  owner_display_name: string | null
   is_active: boolean
   created_at: string
   owner_verified: boolean
@@ -85,6 +87,7 @@ export interface ListingCreatePayload {
   lat?: number
   lon?: number
   maps_link?: string
+  owner_display_name?: string
 }
 
 export interface ReferralStatus {
@@ -155,8 +158,8 @@ export const authAPI = {
   // Register.tsx) — this call only completes the application-level profile
   // (display_name/role/referral) that Firebase doesn't track, for the
   // already-authenticated Firebase user making the request.
-  register: (display_name: string, role: string, referral_code?: string) =>
-    api.post<User>('/auth/register', { display_name, role, referral_code }),
+  register: (display_name: string, role: string, contact_phone: string, referral_code?: string) =>
+    api.post<User>('/auth/register', { display_name, role, contact_phone, referral_code }),
 
   me: () => api.get<User>('/auth/me'),
 
@@ -303,6 +306,11 @@ export const bookingsAPI = {
 
   verifyPayment: (bookingId: string, data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
     api.post<BookingItem>(`/bookings/${bookingId}/verify-payment`, data),
+
+  // Phase 87: only reachable for the seeker's own paid booking (real
+  // ownership + payment-status check server-side).
+  getProviderContact: (bookingId: string) =>
+    api.get<{ display_name: string; contact_phone: string }>(`/bookings/${bookingId}/provider-contact`),
 
   // Addendum 5: provider's own confirmed deals with the seeker's real date/time
   listProvider: () => api.get<ProviderBookingItem[]>('/bookings/provider'),

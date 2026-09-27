@@ -78,6 +78,7 @@ def create_listing(
         maps_link=location["maps_link"],
         address=req.address,
         capacity=req.capacity,
+        owner_display_name=(req.owner_display_name or None),
         is_active=True,
     )
     db.add(asset)

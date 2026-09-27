@@ -89,6 +89,7 @@ def complete_profile(
     referral link is only ever attached once, on this user's first call.
     """
     current_user.display_name = req.display_name
+    current_user.contact_phone = req.contact_phone
     if req.role in ("provider", "seeker", "both"):
         current_user.role = req.role
 

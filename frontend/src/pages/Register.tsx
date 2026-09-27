@@ -26,7 +26,7 @@ export default function Register() {
   const nav = useNavigate()
   const [searchParams] = useSearchParams()
   const [form, setForm] = useState({
-    email: '', password: '', display_name: '', role: 'both',
+    email: '', password: '', display_name: '', role: 'both', contact_phone: '',
     referral_code: searchParams.get('ref') ?? '',
   })
   const [error, setError]     = useState('')
@@ -44,7 +44,7 @@ export default function Register() {
       // application-level profile (display_name/role/referral) right after,
       // authenticated with the Firebase ID token this just produced.
       await createUserWithEmailAndPassword(auth, form.email, form.password)
-      const res = await authAPI.register(form.display_name, form.role, form.referral_code.trim() || undefined)
+      const res = await authAPI.register(form.display_name, form.role, form.contact_phone.trim(), form.referral_code.trim() || undefined)
       // authStore's own onAuthStateChanged listener also fires from the
       // signup above and calls GET /auth/me independently — that race can
       // land before this profile-sync finishes and cache the stale,
@@ -113,6 +113,19 @@ export default function Register() {
               minLength={6}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
               placeholder="••••••••"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+            <input
+              type="tel"
+              value={form.contact_phone}
+              onChange={update('contact_phone')}
+              required
+              pattern="^\+?[\d\s\-()]{7,15}$"
+              title="Enter a valid phone number (7-15 digits, optional +country code)"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
+              placeholder="+91 98765 43210"
             />
           </div>
           <div>

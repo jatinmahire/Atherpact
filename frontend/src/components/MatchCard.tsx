@@ -10,12 +10,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, MapPin, Cpu, BadgeCheck, CloudRain } from 'lucide-react'
 import type { MatchResultItem } from '../api/client'
 import { CategoryIcon, CATEGORY_LABELS } from '../lib/categoryIcons'
+import { haversineKm, formatDistance } from '../lib/distance'
 
 interface Props {
   item: MatchResultItem
   rank: number
   advisoryTag?: string | null
   onNegotiate?: (item: MatchResultItem) => void
+  /** Seeker's real captured location ("Use my location"), if granted —
+   * used only to show a human-readable distance next to the existing
+   * distance score, never to change what's computed or ranked. */
+  userCoords?: { lat: number; lon: number } | null
 }
 
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -38,10 +43,14 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
   )
 }
 
-export default function MatchCard({ item, rank, advisoryTag, onNegotiate }: Props) {
+export default function MatchCard({ item, rank, advisoryTag, onNegotiate, userCoords }: Props) {
   const [expanded, setExpanded] = useState(false)
   const nav = useNavigate()
   const { asset, scores } = item
+
+  const distanceKm = (userCoords && asset.lat != null && asset.lon != null)
+    ? haversineKm(userCoords.lat, userCoords.lon, asset.lat, asset.lon)
+    : null
 
   const badgeColor =
     scores.final_score >= 0.75 ? 'bg-green-100 text-green-700' :
@@ -79,8 +88,13 @@ export default function MatchCard({ item, rank, advisoryTag, onNegotiate }: Prop
             </h3>
             <p className="text-gray-500 text-sm mt-1 flex items-center gap-1">
               <MapPin size={12} /> {asset.address}
+              {distanceKm != null && (
+                <span className="text-gray-400">· {formatDistance(distanceKm)}</span>
+              )}
             </p>
           </div>
+          {/* Price + match are the two numbers a seeker scans for first —
+              kept isolated on their own side, away from descriptive text. */}
           <div className="text-right shrink-0">
             <div className="text-xl font-bold text-navy">
               ₹{asset.price_per_day.toLocaleString('en-IN')}
@@ -106,7 +120,7 @@ export default function MatchCard({ item, rank, advisoryTag, onNegotiate }: Prop
         </p>
 
         {asset.capacity && (
-          <p className="text-xs text-gray-400 mt-2">Capacity: {asset.capacity} guests</p>
+          <p className="text-xs text-gray-400 mt-2">Fits up to {asset.capacity} guests</p>
         )}
 
         <div className="flex gap-2 mt-4">

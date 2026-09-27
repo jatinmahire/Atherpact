@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle, AlertTriangle, Info, Sparkles, Repeat, CreditCard, TrendingUp, Truck } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, AlertTriangle, Info, Sparkles, Repeat, CreditCard, TrendingUp, Truck, Phone } from 'lucide-react'
 import { negotiateAPI, bookingsAPI } from '../api/client'
 import type { MatchResultItem, NegotiateResponse, SmartSuggestion, PricingSuggestion } from '../api/client'
 import { openRazorpayCheckout } from '../lib/razorpay'
@@ -151,6 +151,16 @@ export default function NegotiatePage({ item, onClose }: Props) {
   const [paymentError, setPaymentError] = useState('')
   const [bookingId, setBookingId] = useState<string | null>(null)
   const [paidAmount, setPaidAmount] = useState<number | null>(null)
+  // Phase 87: provider contact, only fetched once this specific booking is
+  // actually paid — the backend re-checks ownership + paid status itself,
+  // this just avoids firing the call before it could possibly succeed.
+  const [providerContact, setProviderContact] = useState<{ display_name: string; contact_phone: string } | null>(null)
+
+  useEffect(() => {
+    if (paymentState === 'paid' && bookingId) {
+      bookingsAPI.getProviderContact(bookingId).then((res) => setProviderContact(res.data)).catch(() => {})
+    }
+  }, [paymentState, bookingId])
 
   useEffect(() => {
     negotiateAPI.smartSuggestion(asset.id).then((res) => setSmartSuggestion(res.data)).catch(() => {})
@@ -422,6 +432,18 @@ export default function NegotiatePage({ item, onClose }: Props) {
                         Booking confirmed &amp; paid{paidAmount != null ? ` (₹${paidAmount.toLocaleString('en-IN')})` : ''} — verified by Razorpay. You can now run visual verification.
                       </motion.div>
                     ) : null}
+                    {/* Phase 87: only ever shown on this specific paid
+                        booking's own confirmation screen — never in search
+                        results or listing details. */}
+                    {paymentState === 'paid' && providerContact && (
+                      <div className="mt-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+                        <div className="text-xs text-gray-400 font-medium mb-1.5">Provider Contact</div>
+                        <p className="text-sm text-gray-800 font-medium">{providerContact.display_name}</p>
+                        <p className="text-sm text-gray-600 flex items-center gap-1.5 mt-0.5">
+                          <Phone size={13} /> {providerContact.contact_phone}
+                        </p>
+                      </div>
+                    )}
                     {/* Addendum 10, Phase 76: a small, honestly-new
                         Confirm & Fulfill step for deliverable items — no
                         real courier/"Porter" integration exists in this

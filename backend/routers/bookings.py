@@ -329,3 +329,40 @@ def verify_payment(
         created_at=booking.created_at,
         asset_title=asset.title if asset else None,
     )
+
+
+class ProviderContactOut(BaseModel):
+    display_name: str
+    contact_phone: str
+
+
+@router.get("/{booking_id}/provider-contact", response_model=ProviderContactOut)
+def provider_contact(
+    booking_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Phase 87: provider contact info for the Confirm-and-Fulfill screen.
+    Reuses the same ownership check as every other booking-scoped endpoint
+    here (_get_own_booking) — a seeker cannot reach another seeker's
+    booking's provider contact by guessing a booking id — plus requires the
+    booking to actually be paid, so this is only ever reachable from a real,
+    confirmed booking's own confirmation screen.
+    """
+    booking = _get_own_booking(db, booking_id, current_user)
+    if booking.payment_status != "paid":
+        raise HTTPException(status_code=403, detail="This booking isn't confirmed yet")
+
+    asset = db.get(Asset, booking.asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    provider = db.get(User, asset.owner_id)
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    display_name = asset.owner_display_name or provider.email.split("@")[0]
+    return ProviderContactOut(
+        display_name=display_name,
+        contact_phone=provider.contact_phone or "Not provided",
+    )

@@ -3,9 +3,22 @@ AetherPact — Pydantic request/response models (shared across routers).
 """
 
 from __future__ import annotations
+import re
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
+
+# Phase 85: a real phone number, loosely — an optional leading +, then 7-15
+# digits (spaces/hyphens stripped before checking). Deliberately not
+# country-specific since providers/seekers aren't limited to one country.
+_PHONE_RE = re.compile(r"^\+?\d{7,15}$")
+
+
+def _validate_phone(v: str) -> str:
+    cleaned = re.sub(r"[ \-()]", "", v)
+    if not _PHONE_RE.match(cleaned):
+        raise ValueError("Enter a valid phone number (7-15 digits, optional +country code)")
+    return cleaned
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -17,7 +30,10 @@ class ProfileSyncRequest(BaseModel):
     set the application-level profile fields Firebase itself doesn't track."""
     display_name: str
     role: str = "both"          # "provider" | "seeker" | "both"
+    contact_phone: str          # Phase 85: required at registration
     referral_code: Optional[str] = None  # another user's referral code, if any
+
+    _validate_contact_phone = field_validator("contact_phone")(_validate_phone)
 
 
 class UserOut(BaseModel):
@@ -25,6 +41,7 @@ class UserOut(BaseModel):
     email: str
     display_name: str
     role: str
+    contact_phone: Optional[str] = None
     created_at: datetime
     verified_at: Optional[datetime] = None
     referral_code: Optional[str] = None
@@ -50,6 +67,9 @@ class ListingCreate(BaseModel):
     lat: Optional[float] = None
     lon: Optional[float] = None
     maps_link: Optional[str] = None
+    # Phase 86: optional per-listing contact name, distinct from the
+    # account-level contact_phone — null/blank if the provider skips it.
+    owner_display_name: Optional[str] = None
 
 
 class ListingOut(BaseModel):
@@ -65,6 +85,7 @@ class ListingOut(BaseModel):
     address: str
     capacity: Optional[int]
     image_path: Optional[str] = None
+    owner_display_name: Optional[str] = None
     is_active: bool
     created_at: datetime
     owner_verified: bool = False  # Phase 15 (Addendum 2): true only if owner has a real verified_at

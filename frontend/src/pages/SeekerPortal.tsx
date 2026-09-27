@@ -78,6 +78,17 @@ export default function SeekerPortal() {
   const nav  = useNavigate()
   const user = authStore.getUser()
 
+  useEffect(() => {
+    // Phase 83: a provider-only account has no seeker portal to see — send
+    // them to their own portal instead of leaving this one reachable by
+    // direct URL. Guests and 'both'-role users are unaffected.
+    const check = () => {
+      if (authStore.isReady() && authStore.getUser()?.role === 'provider') nav('/provider')
+    }
+    check()
+    return authStore.subscribe(check)
+  }, [])
+
   const [query, setQuery]       = useState('')
   const [budget, setBudget]     = useState('')
   const [results, setResults]   = useState<MatchResultItem[]>([])
@@ -179,7 +190,9 @@ export default function SeekerPortal() {
           <span className="font-bold text-navy text-xl">AetherPact</span>
         </div>
         <div className="flex gap-4 items-center">
-          <button onClick={() => nav('/provider')} className="text-sm text-navy font-medium hover:underline">Provider Portal</button>
+          {user?.role === 'both' && (
+            <button onClick={() => nav('/provider')} className="text-sm text-navy font-medium hover:underline">Provider Portal</button>
+          )}
           <button onClick={() => nav('/audit')} className="text-sm text-navy font-medium hover:underline">Visual Audit</button>
           <span className="text-gray-300">|</span>
           {user ? (
@@ -347,6 +360,7 @@ export default function SeekerPortal() {
                         rank={i}
                         advisoryTag={deriveAdvisoryTag(weatherImpact.get(item.asset.id))}
                         onNegotiate={user ? setNegotiating : undefined}
+                        userCoords={geoCoords}
                       />
                     ))}
                   </motion.div>

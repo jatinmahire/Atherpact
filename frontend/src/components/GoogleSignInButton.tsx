@@ -20,6 +20,7 @@ export default function GoogleSignInButton() {
   const [needsRole, setNeedsRole] = useState(false)
   const [pendingName, setPendingName] = useState('')
   const [savingRole, setSavingRole] = useState(false)
+  const [contactPhone, setContactPhone] = useState('')
 
   const handleClick = async () => {
     setError('')
@@ -55,9 +56,16 @@ export default function GoogleSignInButton() {
   }
 
   const chooseRole = async (role: string) => {
+    // Phase 85: required at every registration path, not just the plain
+    // email/password form — Google sign-up would otherwise skip it entirely.
+    if (!/^\+?[\d\s\-()]{7,15}$/.test(contactPhone.trim())) {
+      setError('Enter a valid phone number (7-15 digits, optional +country code)')
+      return
+    }
+    setError('')
     setSavingRole(true)
     try {
-      const res = await authAPI.register(pendingName, role)
+      const res = await authAPI.register(pendingName, role, contactPhone.trim())
       authStore.setUser(res.data)
       nav('/')
     } catch {
@@ -70,7 +78,15 @@ export default function GoogleSignInButton() {
   if (needsRole) {
     return (
       <div className="border border-lavender/30 rounded-xl p-4 bg-lavender/5">
-        <p className="text-sm font-medium text-gray-800 mb-3">Welcome, {pendingName}! Are you a…</p>
+        <p className="text-sm font-medium text-gray-800 mb-3">Welcome, {pendingName}!</p>
+        <input
+          type="tel"
+          value={contactPhone}
+          onChange={(e) => setContactPhone(e.target.value)}
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:border-navy"
+          placeholder="Contact phone, e.g. +91 98765 43210"
+        />
+        <p className="text-sm font-medium text-gray-800 mb-2">Are you a…</p>
         <div className="grid grid-cols-3 gap-2">
           {[
             { value: 'seeker', label: 'Seeker' },

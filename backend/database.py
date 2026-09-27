@@ -58,6 +58,13 @@ class User(Base):
     hashed_pw     = Column(String, nullable=True)  # vestigial post-Firebase-migration, unused
     display_name  = Column(String, nullable=False)
     role          = Column(String, nullable=False)          # "provider" | "seeker" | "both"
+    # Phase 85: captured once at registration, real column (not derived from
+    # anything). Nullable at the DB level for the same reason `role` defaults
+    # to "both" here — get_current_user auto-creates this row on a brand-new
+    # Firebase uid's very first authenticated request, before the frontend's
+    # own /auth/register call (which is where this is actually required and
+    # validated) ever runs.
+    contact_phone = Column(String, nullable=True)
     # Phase 15 (Addendum 2): set only by a real verification_connector call once
     # a real KYC provider key exists. Null means "not verified" — never faked.
     verified_at   = Column(DateTime, nullable=True)
@@ -89,6 +96,10 @@ class Asset(Base):
     # router/frontend, not the column, so pre-existing seed listings without
     # one don't become invalid).
     image_path    = Column(String, nullable=True)
+    # Phase 86: optional per-listing contact name (a provider with several
+    # listings may have a different on-site contact per item) — distinct
+    # from the account-level contact_phone on User. Null when skipped.
+    owner_display_name = Column(String, nullable=True)
     is_active     = Column(Boolean, default=True)
     created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -398,6 +409,7 @@ def seed_database(db: Session) -> None:
             email=SEED_PROVIDER_EMAIL,
             display_name="AetherPact Demo Provider",
             role="provider",
+            contact_phone="+919876543210",
         ))
         db.commit()  # commit user before assets
 
@@ -407,6 +419,7 @@ def seed_database(db: Session) -> None:
             email=SEED_SEEKER_EMAIL,
             display_name="Test Seeker",
             role="both",
+            contact_phone="+919876500000",
         ))
         db.commit()
 
