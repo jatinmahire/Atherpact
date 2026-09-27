@@ -61,7 +61,11 @@ export const authStore = {
           try {
             const res = await authAPI.me()
             _user = res.data
-          } catch {
+          } catch (err) {
+            // Was a silent catch — a failed /auth/me (e.g. blocked as mixed
+            // content, or a dead backend) left the UI stuck on "Sign in"
+            // with a successful Firebase login and zero visible signal why.
+            console.error('authStore: failed to fetch /auth/me after Firebase sign-in', err)
             _user = null
           }
         } else {

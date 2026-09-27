@@ -1,8 +1,33 @@
+<div align="center">
+
 # AetherPact
 
-A real, working B2B marketplace where hospitality businesses (hotels, restaurants, banquet venues, caterers) rent idle resources — commercial kitchens, banquet halls, vehicles, AV equipment — to each other.
+**Unlock unused potential in hospitality.**
 
-Built for a hackathon demo. Runs entirely on one local machine: no cloud APIs, no API keys, no internet dependency at judging time.
+A real, working B2B marketplace where hospitality businesses — hotels, restaurants, banquet venues, caterers — rent out idle resources (commercial kitchens, banquet halls, vehicles, AV equipment) to each other, matched by a real semantic-search AI pipeline and priced by a deterministic negotiation engine.
+
+[![Live Site](https://img.shields.io/badge/Live%20Site-aetherpact--app.surge.sh-B8925A?style=for-the-badge)](https://aetherpact-app.surge.sh)
+[![Backend Health](https://img.shields.io/badge/Backend-Live%20%26%20Healthy-4F7A5B?style=for-the-badge)](https://132-226-189-161.sslip.io/health)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white)
+
+**[🚀 Try the live app →](https://aetherpact-app.surge.sh)**
+
+</div>
+
+---
+
+## Live Deployment
+
+| | |
+|---|---|
+| **Frontend** | [aetherpact-app.surge.sh](https://aetherpact-app.surge.sh) — Surge.sh |
+| **Backend API** | [132-226-189-161.sslip.io](https://132-226-189-161.sslip.io/health) — Oracle Cloud VM, Dockerized, real HTTPS via Let's Encrypt |
+| **Database** | Neon Postgres (serverless, scales to zero when idle) |
+| **Auth** | Firebase Authentication (Google Sign-In + email/password) |
+
+> The backend serves real HTTPS on its own domain (`132-226-189-161.sslip.io` — a free public hostname that resolves straight to the VM's IP, fronted by nginx with a Let's Encrypt certificate) so the deployed frontend can call it without browsers blocking the request as mixed content.
 
 ---
 
@@ -127,32 +152,30 @@ npm run dev
 
 ## Production Deployment (Addendum 8)
 
-The codebase is deployment-ready: backend Dockerized, all config env-var-driven,
-SQLAlchemy models already Postgres-compatible, Alembic migrations set up and
-verified end-to-end. Live URLs below are filled in once each manual deploy
-step (which only the project owner can do — account creation, connecting
-GitHub) is actually completed.
+Live, real, and deployed — not just deployment-ready.
 
-- **Live frontend:** _not yet deployed_
-- **Live backend:** _not yet deployed_
-- **Database:** _not yet provisioned_ (real hosted Postgres — Neon recommended, free tier)
+- **Live frontend:** [aetherpact-app.surge.sh](https://aetherpact-app.surge.sh) — Surge.sh, built with `VITE_API_BASE_URL` pointed at the real backend
+- **Live backend:** [132-226-189-161.sslip.io](https://132-226-189-161.sslip.io/health) — Dockerized FastAPI on an Oracle Cloud VM, behind nginx with a real Let's Encrypt certificate
+- **Database:** Neon Postgres (hosted, serverless — free tier scales compute to zero when idle, which is why the first request after a quiet period can take a few extra seconds to show `"database": "connected"`)
 
-**What's ready:**
-- `backend/Dockerfile` — Python 3.12-slim + build tools for `llama-cpp-python`'s compiled step, model weights pre-downloaded at build time (not first-request time).
-- `backend/.env.example` — every real environment variable this backend reads, with a one-line description each. (No Porter/courier integration exists in this project, despite an earlier addendum draft assuming one — there's nothing to configure for it.)
-- `backend/alembic/` — a verified initial migration (`alembic upgrade head`) that creates all 15 real tables from the actual SQLAlchemy models in `database.py`, tested end-to-end against a fresh database.
-- `GET /health` — reports real per-component status (database connectivity, matching model, negotiation engine, vision pipeline, LLM phrasing, Laya) rather than a fixed string.
-- `frontend/.env.example`, `frontend/vercel.json` — SPA rewrite so direct visits to routes like `/explore` don't 404 on Vercel; `VITE_API_BASE_URL` replaces the hardcoded local dev proxy for production.
+**How it's actually wired:**
+- `backend/Dockerfile` — Python 3.12-slim + build tools for `llama-cpp-python`'s compiled step, CPU-only torch (avoids pulling multi-GB CUDA libraries), headless OpenCV (no `libGL.so.1` dependency in a slim image).
+- `backend/.env.example` — every real environment variable this backend reads. (No Porter/courier integration exists in this project — there's nothing to configure for it.)
+- `backend/alembic/` — a verified migration (`alembic upgrade head`) that creates all real tables from the SQLAlchemy models in `database.py`, tested against both a fresh database and the live Neon instance.
+- `GET /health` — reports real per-component status (database connectivity, matching model, negotiation engine, vision pipeline, LLM phrasing, Laya) rather than a fixed string. Check it live: <https://132-226-189-161.sslip.io/health>
+- The VM runs nginx as a TLS-terminating reverse proxy in front of the Dockerized app (port 8000, not exposed directly), with certbot renewing the certificate automatically. Both the OS firewall (`firewalld`) and the cloud-level security list have explicit rules for ports 80/443.
+- `dist/200.html` — a copy of `index.html` published alongside the build so Surge serves the SPA correctly on a direct visit or refresh of any client-side route (`/provider`, `/audit`, etc.), not just `/`.
+- Google Sign-In works on the live domain via Firebase's Authorized Domains list (`aetherpact-app.surge.sh` is registered there).
 
-**Still needed before this section can be filled in for real** — all require the project owner's own accounts:
-1. Create a free Neon Postgres project, set `DATABASE_URL` in the backend's real environment.
-2. Deploy `backend/` to Render as a Docker service (≥2GB RAM recommended — three real AI models load into memory at once), with every var from `.env.example` set to real values, and the Firebase service-account JSON uploaded via Render's **Secret Files** feature (it's git-ignored, so a git-based build never has it otherwise).
-3. Deploy `frontend/` to Vercel with `VITE_API_BASE_URL` set to the real Render URL.
-4. Re-run the real end-to-end journeys (search → negotiate → book → pay → check-in/out) against the live URLs, and confirm a booking survives a Render service restart.
+**Known, disclosed limitations of this deployment:**
+- The Oracle VM instance runs on shape `VM.Standard.E5.Flex`, not the Always-Free `A1.Flex` shape (an ARM capacity error forced this at creation time) — it's most likely drawing on trial credit rather than the permanent free tier.
+- `llm_phrasing` and `laya_advisory` report `unavailable` in the live health check — deterministic fallbacks are active in production rather than the full Qwen/Laya models.
 
 ---
 
 ## Demo User Journey
+
+Try it live at **[aetherpact-app.surge.sh](https://aetherpact-app.surge.sh)** — no setup needed. Or run it locally:
 
 1. Open http://localhost:5173
 2. Click **Browse Available Resources** (no login needed for search)

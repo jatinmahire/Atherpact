@@ -31,7 +31,19 @@ export default function GoogleSignInButton() {
         setPendingName(cred.user.displayName || 'New User')
         setNeedsRole(true)
       } else {
-        nav('/')
+        // Existing user: don't just navigate and hope the ambient
+        // onAuthStateChanged listener's /auth/me round trip lands in time —
+        // fetch and set the store directly so the UI flips immediately, and
+        // so a failure here is visible instead of leaving Navbar stuck on
+        // "Sign in" with a fully successful Firebase login.
+        try {
+          const res = await authAPI.me()
+          authStore.setUser(res.data)
+          nav('/')
+        } catch (err) {
+          console.error('GoogleSignInButton: signed into Firebase but /auth/me failed', err)
+          setError('Signed in, but could not reach the server. Please try again.')
+        }
       }
     } catch (err: any) {
       if (err?.code !== 'auth/popup-closed-by-user') {
