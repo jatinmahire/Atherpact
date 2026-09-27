@@ -14,6 +14,11 @@ const LINKS = [
   { label: 'Explore', path: '/explore' },
   { label: 'How It Works', path: '/how-it-works' },
   { label: 'About', path: '/about' },
+  {
+    label: 'Weather Twin',
+    path: '/weather-twin',
+    title: 'Live weather, demand-impact scoring, and a real Nugen-reasoned map for every listing.',
+  },
 ]
 
 export default function Navbar() {
@@ -41,7 +46,7 @@ export default function Navbar() {
 
       <div className="hidden md:flex gap-6">
         {LINKS.map((l) => (
-          <button key={l.path} onClick={() => nav(l.path)}
+          <button key={l.path} onClick={() => nav(l.path)} title={l.title}
             className="text-sm text-gray-600 font-medium hover:text-navy transition-colors">
             {l.label}
           </button>

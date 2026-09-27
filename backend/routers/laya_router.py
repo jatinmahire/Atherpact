@@ -14,6 +14,7 @@ from models import (
 )
 from services.laya_service import classify_chat_intent, check_listing_safety
 from services.matcher import rank_listings
+from services.nugen_service import listing_domain_compliance_review
 from database import Asset
 
 router = APIRouter(tags=["laya"])
@@ -81,8 +82,13 @@ def check_listing(payload: dict, db: Session = Depends(get_db)):
     """
     Advisory safety check on a listing description before publishing.
     Returns an advisory note if Laya flags something — never blocks the listing.
+
+    Addendum 9, Phase 63: also runs the Nugen domain-aligned compliance
+    reviewer alongside Laya's own quick check, labeled distinctly on the
+    frontend. Both stay advisory; neither ever blocks publishing.
     """
     description = payload.get("description", "")
+    category = payload.get("category", "")
     flagged, confidence, label = check_listing_safety(description)
 
     ref_id = str(uuid.uuid4())
@@ -97,6 +103,8 @@ def check_listing(payload: dict, db: Session = Depends(get_db)):
     ))
     db.commit()
 
+    domain_review = listing_domain_compliance_review(category, description) if description else None
+
     return {
         "flagged": flagged,
         "confidence": round(confidence, 3),
@@ -106,4 +114,5 @@ def check_listing(payload: dict, db: Session = Depends(get_db)):
             "You may still publish — this is an advisory note only."
             if flagged else None
         ),
+        "domain_review": domain_review,
     }

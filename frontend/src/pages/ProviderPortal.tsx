@@ -11,6 +11,7 @@ import type { Listing, RecurringAvailabilityRule, AvailabilityWindow, ProviderAn
 import { authStore } from '../store/auth'
 import { useNavigate } from 'react-router-dom'
 import { useCountUp } from '../hooks/useCountUp'
+import NugenBadge from '../components/NugenBadge'
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -225,6 +226,7 @@ interface SafetyNote {
   flagged: boolean
   advisory_note: string | null
   confidence: number
+  domain_review: string | null // Nugen domain-aligned compliance reviewer (Addendum 9, Phase 63)
 }
 
 export default function ProviderPortal() {
@@ -341,13 +343,13 @@ export default function ProviderPortal() {
     const t = setTimeout(async () => {
       setCheckingDesc(true)
       try {
-        const res = await listingsAPI.checkSafety(form.description)
+        const res = await listingsAPI.checkSafety(form.description, form.category)
         setSafetyNote(res.data)
       } catch { /* advisory only — never blocks */ }
       finally { setCheckingDesc(false) }
     }, 800)
     return () => clearTimeout(t)
-  }, [form.description])
+  }, [form.description, form.category])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -401,7 +403,7 @@ export default function ProviderPortal() {
           <button onClick={() => nav('/seeker')} className="text-sm text-navy font-medium hover:underline">Find Resources</button>
           <button onClick={() => nav('/audit')} className="text-sm text-navy font-medium hover:underline">Visual Audit</button>
           <span className="text-gray-300">|</span>
-          <span className="text-sm text-gray-500">{user?.display_name ?? 'Provider'}</span>
+          {user && <span className="text-sm font-semibold text-navy bg-navy/10 px-3 py-1.5 rounded-full">{user.display_name}</span>}
           <button onClick={() => { authStore.logout(); nav('/') }} className="text-sm text-navy hover:underline">Sign out</button>
         </div>
       </nav>
@@ -502,7 +504,21 @@ export default function ProviderPortal() {
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                           className="mt-2 bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded-xl px-3 py-2 flex items-start gap-2">
                           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                          <span>{safetyNote.advisory_note} (Confidence: {(safetyNote.confidence * 100).toFixed(0)}%)</span>
+                          <span><span className="font-medium">Quick Check:</span> {safetyNote.advisory_note} (Confidence: {(safetyNote.confidence * 100).toFixed(0)}%)</span>
+                        </motion.div>
+                      )}
+                      {/* Addendum 9, Phase 63: Nugen domain-aligned compliance
+                          reviewer, labeled distinctly from Laya's quick check
+                          above. Absent if Nugen was unreachable — never a
+                          fabricated review, and never a hard block either. */}
+                      {safetyNote?.domain_review && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                          className="mt-2 bg-sage/10 border border-sage/30 text-gray-700 text-xs rounded-xl px-3 py-2">
+                          <p><span className="font-medium">Domain Compliance Review, powered by Nugen:</span> {safetyNote.domain_review}</p>
+                          <NugenBadge
+                            className="mt-1.5"
+                            focus="Domain-aligned safety, hygiene, and regulatory review for hospitality resource listings in India."
+                          />
                         </motion.div>
                       )}
                     </AnimatePresence>

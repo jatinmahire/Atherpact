@@ -14,6 +14,7 @@ so the rest of the application keeps running without interruption.
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -30,6 +31,15 @@ def _get_laya():
     if _laya_loaded:
         return _laya
     _laya_loaded = True
+    # Addendum 8, Phase 59: Laya (torch + transformers, ~800MB checkpoint)
+    # is by far the heaviest of the three real AI components, and was
+    # always designed to be optional — every function below already has a
+    # real, honest neutral-default fallback for exactly this case. Setting
+    # DISABLE_LAYA=true (e.g. on a free/memory-constrained hosting tier)
+    # skips loading it entirely rather than crashing under memory pressure.
+    if os.environ.get("DISABLE_LAYA", "").lower() in ("1", "true", "yes"):
+        logger.info("Laya disabled via DISABLE_LAYA — advisory checks will use their neutral-default fallback.")
+        return None
     try:
         import laya  # type: ignore
         # Prefer the bundled local checkpoint (no Hugging Face Hub cache/symlink

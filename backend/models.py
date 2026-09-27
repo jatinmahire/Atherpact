@@ -164,6 +164,7 @@ class NegotiateResponse(BaseModel):
     dispute_risk_badge: Optional[str]  # advisory from Laya (Phase 5)
     negotiation_id: str
     rounds_log: Optional[List[NegotiationRound]] = None  # present only when multi_round=True
+    domain_insight: Optional[str] = None  # Nugen domain-aligned advisor (Addendum 9, Phase 62)
 
 
 class SmartSuggestionOut(BaseModel):

@@ -6,10 +6,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Loader2, MapPin, LocateFixed } from 'lucide-react'
-import { matchAPI, listingsAPI } from '../api/client'
-import type { MatchResultItem, Listing } from '../api/client'
+import { Search, Loader2, MapPin, LocateFixed, CloudRain } from 'lucide-react'
+import { matchAPI, listingsAPI, weatherTwinAPI } from '../api/client'
+import type { MatchResultItem, Listing, WeatherTwinListing } from '../api/client'
 import { authStore } from '../store/auth'
+import { simulationStore } from '../store/simulation'
+import { deriveAdvisoryTag } from '../lib/weatherAdvisory'
 import MatchCard from '../components/MatchCard'
 import { SkeletonList } from '../components/SkeletonCard'
 import NegotiatePage from './NegotiatePage'
@@ -25,7 +27,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 /** Plain listing card for the default "browse all" view — no match score,
  * since no search query has been run. Never fabricates a score to fill
  * this in; that's what MatchCard (used once a real search runs) is for. */
-function ListingBrowseCard({ listing, rank, onNegotiate }: { listing: Listing; rank: number; onNegotiate?: () => void }) {
+function ListingBrowseCard({ listing, rank, advisoryTag, onNegotiate }: { listing: Listing; rank: number; advisoryTag?: string | null; onNegotiate?: () => void }) {
   const nav = useNavigate()
   return (
     <motion.div
@@ -51,6 +53,14 @@ function ListingBrowseCard({ listing, rank, onNegotiate }: { listing: Listing; r
           <div className="text-xs text-gray-400">per day</div>
         </div>
       </div>
+      {/* Addendum 10, Phase 75: derived mechanically from the real
+          severity/demand_impact values already computed server-side —
+          never a fabricated message. */}
+      {advisoryTag && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-wine bg-wine/10 rounded-lg px-2.5 py-1.5 w-fit">
+          <CloudRain size={12} className="shrink-0" /> {advisoryTag}
+        </div>
+      )}
       <p className="text-gray-600 text-sm mt-3 leading-relaxed line-clamp-2">{listing.description}</p>
       {listing.capacity && (
         <p className="text-xs text-gray-400 mt-2">Capacity: {listing.capacity} guests</p>
@@ -124,6 +134,19 @@ export default function SeekerPortal() {
       .finally(() => setLoadingAll(false))
   }, [category])
 
+  // Addendum 10, Phase 75: real weather-impact lookup for the advisory
+  // tags below, reusing the same Phase 68/69 twin-snapshot endpoint and
+  // re-fetched whenever the global Simulation Mode changes so tags update
+  // together with the rest of the app.
+  const [weatherImpact, setWeatherImpact] = useState<Map<string, WeatherTwinListing>>(new Map())
+  const [simMode, setSimMode] = useState(simulationStore.getMode())
+  useEffect(() => simulationStore.subscribe(() => setSimMode(simulationStore.getMode())), [])
+  useEffect(() => {
+    weatherTwinAPI.snapshot(simMode ?? 'normal')
+      .then((res) => setWeatherImpact(new Map(res.data.listings.map((l) => [l.asset_id, l]))))
+      .catch(() => {})
+  }, [simMode])
+
   const search = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim()) return
@@ -164,7 +187,11 @@ export default function SeekerPortal() {
           <button onClick={() => nav('/provider')} className="text-sm text-navy font-medium hover:underline">Provider Portal</button>
           <button onClick={() => nav('/audit')} className="text-sm text-navy font-medium hover:underline">Visual Audit</button>
           <span className="text-gray-300">|</span>
-          <span className="text-sm text-gray-500">{user?.display_name ?? 'Guest'}</span>
+          {user ? (
+            <span className="text-sm font-semibold text-navy bg-navy/10 px-3 py-1.5 rounded-full">{user.display_name}</span>
+          ) : (
+            <span className="text-sm text-gray-500">Guest</span>
+          )}
           {user ? (
             <button onClick={() => { authStore.logout(); nav('/') }} className="text-sm text-navy hover:underline">Sign out</button>
           ) : (
@@ -281,6 +308,7 @@ export default function SeekerPortal() {
                       key={listing.id}
                       listing={listing}
                       rank={i}
+                      advisoryTag={deriveAdvisoryTag(weatherImpact.get(listing.id))}
                       onNegotiate={user ? () => setNegotiating({
                         asset: listing,
                         scores: { semantic_score: 0, price_score: 0, distance_score: 0, final_score: 0 },
@@ -320,6 +348,7 @@ export default function SeekerPortal() {
                         key={item.asset.id}
                         item={item}
                         rank={i}
+                        advisoryTag={deriveAdvisoryTag(weatherImpact.get(item.asset.id))}
                         onNegotiate={user ? setNegotiating : undefined}
                       />
                     ))}

@@ -20,3 +20,10 @@ python-dotenv==1.2.3
 
 # Phase 38 (Addendum 4): Razorpay payments
 razorpay==2.0.1
+
+# Addendum 8 (Phase 57): hosted Postgres (Neon) in production + Alembic
+# schema migrations. SQLite (local dev) needs neither — psycopg2 is a
+# pure Postgres driver, and Alembic just reads the same SQLAlchemy models
+# already defined in database.py.
+psycopg2-binary==2.9.9
+alembic==1.13.2

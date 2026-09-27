@@ -1,15 +1,30 @@
 /**
  * AetherPact — Typed API client (axios).
- * All requests go to FastAPI at localhost:8000 via Vite proxy at /api.
+ * Local dev: requests go to FastAPI at localhost:8000 via Vite's dev-only
+ * proxy at /api (see vite.config.ts) — unchanged behavior.
+ * Production (Addendum 8, Phase 58): there is no Vite proxy once this is a
+ * static build on Vercel, so VITE_API_BASE_URL must be set to the real
+ * deployed backend's own origin (e.g. https://aetherpact-backend.onrender.com,
+ * no /api suffix — the backend's own routes were never prefixed with /api,
+ * that was always just this proxy's convention).
  */
 
 import axios from 'axios'
 import { auth } from '../lib/firebase'
+import type { SimulationMode } from '../store/simulation'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
+
+// Static asset origin for listing/audit photos served by the backend's own
+// StaticFiles mounts (/listing_images, /audit_images — also never under
+// /api). Empty string in local dev keeps the same relative path Vite's own
+// proxy already handles; in production this becomes the real backend origin.
+const ASSET_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 // Phase 37 (Addendum 4): attach a real, current Firebase ID token to every
 // request. getIdToken() also transparently refreshes an expired token, so
@@ -57,7 +72,7 @@ export interface Listing {
 /** Builds a browsable URL for a stored listing image_path. */
 export function listingImageUrl(imagePath: string): string {
   const filename = imagePath.split(/[\\/]/).pop()
-  return `/listing_images/${filename}`
+  return `${ASSET_BASE_URL}/listing_images/${filename}`
 }
 
 export interface ListingCreatePayload {
@@ -117,6 +132,7 @@ export interface NegotiateResponse {
   dispute_risk_badge: string | null
   negotiation_id: string
   rounds_log: NegotiationRound[] | null
+  domain_insight: string | null // Nugen domain-aligned advisor (Addendum 9, Phase 62)
 }
 
 export interface SmartSuggestion {
@@ -168,8 +184,8 @@ export const listingsAPI = {
 
   get: (id: string) => api.get<Listing>(`/listings/${id}`),
 
-  checkSafety: (description: string) =>
-    api.post('/listings/check', { description }),
+  checkSafety: (description: string, category: string) =>
+    api.post('/listings/check', { description, category }),
 
   listRecurringAvailability: (assetId: string) =>
     api.get<RecurringAvailabilityRule[]>(`/listings/${assetId}/recurring-availability`),
@@ -232,6 +248,25 @@ export const negotiateAPI = {
 
   smartSuggestion: (assetId: string) =>
     api.get<SmartSuggestion>(`/negotiate/smart-suggestion/${assetId}`),
+
+  // Addendum 10, Phase 74: a real, honestly-new pricing-suggestion feature
+  // (no equivalent existed before this phase) with a real weather_multiplier
+  // reusing Phase 69's exact demand_impact formula.
+  pricingSuggestion: (assetId: string, providerAsk: number, startsAtIso: string, simulation: SimulationMode) =>
+    api.get<PricingSuggestion>(`/negotiate/pricing-suggestion/${assetId}`, {
+      params: { provider_ask: providerAsk, starts_at: startsAtIso, simulation: simulation ?? undefined },
+    }),
+}
+
+export interface PricingSuggestion {
+  base_rate: number
+  day_multiplier: number
+  lead_time_discount: number
+  demand_factor: number
+  weather_multiplier: number
+  suggested_rate: number
+  explanation: string
+  weather_context: { weather: { precip_prob: number; wind_kmh: number; temp_c: number }; severity: number; demand_impact: number } | null
 }
 
 // ─── Bookings ────────────────────────────────────────────────────────────────
@@ -314,7 +349,7 @@ export interface AuditSummary {
 /** Builds a browsable URL for a stored audit image_path (may contain OS-specific separators). */
 export function auditImageUrl(imagePath: string): string {
   const filename = imagePath.split(/[\\/]/).pop()
-  return `/audit_images/${filename}`
+  return `${ASSET_BASE_URL}/audit_images/${filename}`
 }
 
 export const auditAPI = {
@@ -401,4 +436,33 @@ export interface ContactMessagePayload {
 
 export const contactAPI = {
   send: (payload: ContactMessagePayload) => api.post<{ id: string; created_at: string }>('/contact', payload),
+}
+
+// ─── Weather Digital Twin (Addendum 10) ───────────────────────────────────────
+
+export interface WeatherTwinListing {
+  asset_id: string
+  title: string
+  category: string
+  resource_type: string
+  lat: number
+  lon: number
+  weather: { precip_prob: number; wind_kmh: number; temp_c: number }
+  severity: number
+  demand_impact: number
+  dominant_factor: 'rain' | 'wind' | 'heat' | 'none'
+  social_signal: string
+  reasoning: string | null
+}
+
+export type WeatherScenario = 'normal' | 'heavy_rain' | 'heat_wave'
+
+export interface WeatherTwinSnapshot {
+  scenario: WeatherScenario
+  listings: WeatherTwinListing[]
+}
+
+export const weatherTwinAPI = {
+  snapshot: (scenario: WeatherScenario) =>
+    api.get<WeatherTwinSnapshot>('/weather/twin-snapshot', { params: { scenario } }),
 }

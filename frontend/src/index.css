@@ -69,9 +69,13 @@ html {
    light-sweep on hover, GPU-accelerated (transform only). Reduced-motion
    users just don't get the sweep — the card itself is unaffected either
    way, so nothing is lost functionally. */
-.card-shine {
-  position: relative;
-}
+/* No position rule here on purpose: every real usage already carries its
+   own explicit Tailwind position utility (absolute or relative). Setting
+   position here too used to silently win over Tailwind's utility class —
+   Tailwind v4 wraps its utilities in a CSS cascade layer, and unlayered
+   CSS always beats layered CSS regardless of source order or specificity,
+   so this plain rule was overriding `absolute` on the hero's floating
+   card and knocking it off-screen. */
 .card-shine::after {
   content: '';
   position: absolute;

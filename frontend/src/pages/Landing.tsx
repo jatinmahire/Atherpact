@@ -229,9 +229,11 @@ export default function Landing() {
         <div className="flex gap-4 items-center text-sm">
           <button onClick={() => nav('/seeker')} className="text-warm-white/80 hover:text-warm-white transition-colors">Search</button>
           <button onClick={() => nav('/audit')} className="text-warm-white/80 hover:text-warm-white transition-colors">Verify</button>
+          <button onClick={() => nav('/weather-twin')} title="Live weather, demand-impact scoring, and a real Nugen-reasoned map for every listing."
+            className="text-warm-white/80 hover:text-warm-white transition-colors">Weather Twin</button>
           {user ? (
             <>
-              <span className="text-warm-white/60">{user.display_name}</span>
+              <span className="text-sm font-semibold text-brass bg-brass/15 px-3 py-1.5 rounded-full">{user.display_name}</span>
               <button onClick={() => { authStore.logout(); nav('/') }} className="text-warm-white/80 hover:text-warm-white transition-colors">Sign out</button>
             </>
           ) : (

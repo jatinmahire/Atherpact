@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+aetherpact.db
+aetherpact.db-shm
+aetherpact.db-wal
+server_out.log
+server_err.log
+server_pid*.txt
+listing_images/
+audit_images/
+data/
+.env

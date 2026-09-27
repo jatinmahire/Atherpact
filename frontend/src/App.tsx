@@ -17,6 +17,8 @@ import HowItWorks     from './pages/HowItWorks'
 import About          from './pages/About'
 import Contact        from './pages/Contact'
 import ListingDetail  from './pages/ListingDetail'
+import WeatherTwin    from './pages/WeatherTwin'
+import SimulationBanner from './components/SimulationBanner'
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -47,6 +49,7 @@ function AnimatedRoutes() {
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/about"        element={<About />} />
           <Route path="/contact"      element={<Contact />} />
+          <Route path="/weather-twin" element={<WeatherTwin />} />
         </Routes>
       </motion.div>
     </AnimatePresence>
@@ -64,6 +67,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {/* Addendum 10, Phase 73: persistent across every route, never
+          re-mounted by page-transition animations. */}
+      <SimulationBanner />
       <AnimatedRoutes />
     </BrowserRouter>
   )

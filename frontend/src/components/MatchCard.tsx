@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, MapPin, Cpu, BadgeCheck } from 'lucide-react'
+import { ChevronDown, MapPin, Cpu, BadgeCheck, CloudRain } from 'lucide-react'
 import type { MatchResultItem } from '../api/client'
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -21,6 +21,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 interface Props {
   item: MatchResultItem
   rank: number
+  advisoryTag?: string | null
   onNegotiate?: (item: MatchResultItem) => void
 }
 
@@ -44,7 +45,7 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
   )
 }
 
-export default function MatchCard({ item, rank, onNegotiate }: Props) {
+export default function MatchCard({ item, rank, advisoryTag, onNegotiate }: Props) {
   const [expanded, setExpanded] = useState(false)
   const nav = useNavigate()
   const { asset, scores } = item
@@ -96,6 +97,15 @@ export default function MatchCard({ item, rank, onNegotiate }: Props) {
             </span>
           </div>
         </div>
+
+        {/* Addendum 10, Phase 75: derived mechanically from the real
+            severity/demand_impact values already computed server-side —
+            never a fabricated message. */}
+        {advisoryTag && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-wine bg-wine/10 rounded-lg px-2.5 py-1.5 w-fit">
+            <CloudRain size={12} className="shrink-0" /> {advisoryTag}
+          </div>
+        )}
 
         <p className="text-gray-600 text-sm mt-3 leading-relaxed line-clamp-2">
           {asset.description}

@@ -5,6 +5,7 @@ Phase 2: Core Data Model, Listings, and Availability
 
 import math
 import hashlib
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -14,20 +15,30 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
-DATABASE_URL = "sqlite:///./aetherpact.db"
+# Addendum 8, Phase 57: DATABASE_URL is the standard convention Neon (and
+# most Postgres hosts) expect. Defaults to a local SQLite file only for
+# local development convenience — production always sets this to a real
+# hosted Postgres connection string.
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./aetherpact.db")
+_IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    # check_same_thread is a SQLite-only connect arg — passing it to a
+    # Postgres driver (psycopg2) would raise, so it's applied conditionally.
+    connect_args={"check_same_thread": False} if _IS_SQLITE else {},
 )
 
-# Enable WAL mode and foreign-key enforcement for SQLite
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_conn, _):
-    cursor = dbapi_conn.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+if _IS_SQLITE:
+    # Enable WAL mode and foreign-key enforcement — SQLite-only pragmas,
+    # meaningless (and unavailable) on Postgres, which enforces foreign
+    # keys and durable writes by default.
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, _):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

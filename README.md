@@ -125,6 +125,33 @@ npm run dev
 
 ---
 
+## Production Deployment (Addendum 8)
+
+The codebase is deployment-ready: backend Dockerized, all config env-var-driven,
+SQLAlchemy models already Postgres-compatible, Alembic migrations set up and
+verified end-to-end. Live URLs below are filled in once each manual deploy
+step (which only the project owner can do — account creation, connecting
+GitHub) is actually completed.
+
+- **Live frontend:** _not yet deployed_
+- **Live backend:** _not yet deployed_
+- **Database:** _not yet provisioned_ (real hosted Postgres — Neon recommended, free tier)
+
+**What's ready:**
+- `backend/Dockerfile` — Python 3.12-slim + build tools for `llama-cpp-python`'s compiled step, model weights pre-downloaded at build time (not first-request time).
+- `backend/.env.example` — every real environment variable this backend reads, with a one-line description each. (No Porter/courier integration exists in this project, despite an earlier addendum draft assuming one — there's nothing to configure for it.)
+- `backend/alembic/` — a verified initial migration (`alembic upgrade head`) that creates all 15 real tables from the actual SQLAlchemy models in `database.py`, tested end-to-end against a fresh database.
+- `GET /health` — reports real per-component status (database connectivity, matching model, negotiation engine, vision pipeline, LLM phrasing, Laya) rather than a fixed string.
+- `frontend/.env.example`, `frontend/vercel.json` — SPA rewrite so direct visits to routes like `/explore` don't 404 on Vercel; `VITE_API_BASE_URL` replaces the hardcoded local dev proxy for production.
+
+**Still needed before this section can be filled in for real** — all require the project owner's own accounts:
+1. Create a free Neon Postgres project, set `DATABASE_URL` in the backend's real environment.
+2. Deploy `backend/` to Render as a Docker service (≥2GB RAM recommended — three real AI models load into memory at once), with every var from `.env.example` set to real values, and the Firebase service-account JSON uploaded via Render's **Secret Files** feature (it's git-ignored, so a git-based build never has it otherwise).
+3. Deploy `frontend/` to Vercel with `VITE_API_BASE_URL` set to the real Render URL.
+4. Re-run the real end-to-end journeys (search → negotiate → book → pay → check-in/out) against the live URLs, and confirm a booking survives a Render service restart.
+
+---
+
 ## Demo User Journey
 
 1. Open http://localhost:5173

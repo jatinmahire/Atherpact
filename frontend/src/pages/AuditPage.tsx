@@ -220,7 +220,7 @@ export default function AuditPage() {
           <button onClick={() => nav('/seeker')} className="text-sm text-navy font-medium hover:underline">Find Resources</button>
           <button onClick={() => nav('/provider')} className="text-sm text-navy font-medium hover:underline">Provider Portal</button>
           <span className="text-gray-300">|</span>
-          <span className="text-sm text-gray-500">{user?.display_name ?? 'Guest'}</span>
+          {user && <span className="text-sm font-semibold text-navy bg-navy/10 px-3 py-1.5 rounded-full">{user.display_name}</span>}
           {user ? (
             <button onClick={() => { authStore.logout(); nav('/') }} className="text-sm text-navy hover:underline">Sign out</button>
           ) : (

@@ -6,12 +6,19 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle, AlertTriangle, Info, Sparkles, Repeat, CreditCard } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, AlertTriangle, Info, Sparkles, Repeat, CreditCard, TrendingUp, Truck } from 'lucide-react'
 import { negotiateAPI, bookingsAPI } from '../api/client'
-import type { MatchResultItem, NegotiateResponse, SmartSuggestion } from '../api/client'
+import type { MatchResultItem, NegotiateResponse, SmartSuggestion, PricingSuggestion } from '../api/client'
 import { openRazorpayCheckout } from '../lib/razorpay'
 import { authStore } from '../store/auth'
 import { useCountUp } from '../hooks/useCountUp'
+import NugenBadge from '../components/NugenBadge'
+import { simulationStore } from '../store/simulation'
+
+// Addendum 10, Phase 76: deliverable resource categories get a real
+// delivery-risk line on the post-payment Confirm & Fulfill step; venue-
+// type categories (kitchen, hall, rooftop) don't get delivered anywhere.
+const DELIVERABLE_CATEGORIES = new Set(['av_equipment', 'transportation'])
 
 type PaymentState = 'idle' | 'creating_booking' | 'creating_order' | 'awaiting_payment' | 'verifying' | 'paid' | 'failed'
 
@@ -123,6 +130,15 @@ export default function NegotiatePage({ item, onClose }: Props) {
   const [multiRound, setMultiRound] = useState(false)
   const [smartSuggestion, setSmartSuggestion] = useState<SmartSuggestion | null>(null)
 
+  // Addendum 10, Phases 74 & 76: a real, honestly-new pricing-suggestion
+  // feature with a real weather_multiplier, re-fetched whenever the
+  // provider's ask, the chosen dates, or the global Simulation Mode
+  // changes — so it (and the delivery-risk line below, Phase 76) update
+  // together with the rest of the app when Simulation Mode is toggled.
+  const [pricing, setPricing] = useState<PricingSuggestion | null>(null)
+  const [simMode, setSimMode] = useState(simulationStore.getMode())
+  useEffect(() => simulationStore.subscribe(() => setSimMode(simulationStore.getMode())), [])
+
   // Phase 38 (Addendum 4): real Razorpay payment — a booking is only ever
   // "Paid" after the backend's own server-side signature verification
   // succeeds, never from the client-side Checkout callback alone.
@@ -134,6 +150,18 @@ export default function NegotiatePage({ item, onClose }: Props) {
   useEffect(() => {
     negotiateAPI.smartSuggestion(asset.id).then((res) => setSmartSuggestion(res.data)).catch(() => {})
   }, [asset.id])
+
+  // Addendum 10, Phase 74: debounced so it doesn't fire on every keystroke.
+  useEffect(() => {
+    const providerAsk = parseFloat(form.provider_ask)
+    if (!providerAsk || !form.starts_at) { setPricing(null); return }
+    const t = setTimeout(() => {
+      negotiateAPI.pricingSuggestion(asset.id, providerAsk, new Date(form.starts_at).toISOString(), simMode)
+        .then((res) => setPricing(res.data))
+        .catch(() => setPricing(null))
+    }, 500)
+    return () => clearTimeout(t)
+  }, [asset.id, form.provider_ask, form.starts_at, simMode])
 
   const update = (f: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((p) => ({ ...p, [f]: e.target.value }))
@@ -200,6 +228,20 @@ export default function NegotiatePage({ item, onClose }: Props) {
                     className="text-xs bg-navy text-espresso px-2.5 py-1 rounded-lg font-medium shrink-0 hover:bg-navy-light transition-colors">
                     Use this
                   </button>
+                </div>
+              )}
+              {/* Addendum 10, Phase 74: a small, honestly-new pricing-
+                  suggestion feature (no equivalent existed in this project
+                  before this addendum) with a real weather_multiplier that
+                  reuses Phase 69's demand_impact function exactly. */}
+              {pricing && (
+                <div className="bg-sage/10 border border-sage/30 rounded-xl px-3 py-2.5 flex items-start gap-2">
+                  <TrendingUp size={14} className="text-sage mt-0.5 shrink-0" />
+                  <div className="flex-1 text-xs text-gray-600">
+                    <span className="font-medium text-sage">Suggested rate</span>{' '}
+                    <span className="font-semibold">₹{pricing.suggested_rate.toLocaleString('en-IN')}/day</span>
+                    <p className="text-gray-400 mt-0.5">{pricing.explanation}</p>
+                  </div>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
@@ -322,6 +364,22 @@ export default function NegotiatePage({ item, onClose }: Props) {
                           <p>{result.llm_phrasing}</p>
                         </div>
                       )}
+                      {/* Addendum 9, Phase 62: Nugen domain-aligned negotiation
+                          advisor — a secondary panel next to the real clearing
+                          price, never the price itself. Absent (not shown) if
+                          Nugen was unreachable — no fabricated insight. */}
+                      {result.domain_insight && (
+                        <div className="bg-sage/10 border border-sage/30 rounded-xl px-4 py-3 text-sm text-gray-700">
+                          <div className="flex items-center gap-1.5 mb-1.5 text-xs text-gray-400 font-medium">
+                            <Info size={12} /> Domain Insight
+                          </div>
+                          <p>{result.domain_insight}</p>
+                          <NugenBadge
+                            className="mt-2"
+                            focus="Domain-aligned assessment of typical B2B hospitality rental pricing in India, by resource type and city tier."
+                          />
+                        </div>
+                      )}
                       {result.extra_terms && (
                         <div className="text-xs text-gray-500 bg-gray-50 rounded-xl px-3 py-2">
                           <span className="font-medium">Extra terms:</span> {result.extra_terms}
@@ -355,7 +413,30 @@ export default function NegotiatePage({ item, onClose }: Props) {
                         </svg>
                         Booking confirmed &amp; paid{paidAmount != null ? ` (₹${paidAmount.toLocaleString('en-IN')})` : ''} — verified by Razorpay. You can now run visual verification.
                       </motion.div>
-                    ) : (
+                    ) : null}
+                    {/* Addendum 10, Phase 76: a small, honestly-new
+                        Confirm & Fulfill step for deliverable items — no
+                        real courier/"Porter" integration exists in this
+                        project (confirmed before building this), so this
+                        is disclosed as this project's own delivery-risk
+                        check, reusing the same real severity calculation
+                        as the rest of the Weather Digital Twin. */}
+                    {paymentState === 'paid' && DELIVERABLE_CATEGORIES.has(asset.category) && (
+                      <div className="mt-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium mb-1.5">
+                          <Truck size={12} /> Confirm & Fulfill
+                        </div>
+                        {pricing?.weather_context && pricing.weather_context.severity >= 0.5 ? (
+                          <p className="text-sm text-amber-700 flex items-center gap-1.5">
+                            <AlertTriangle size={13} className="shrink-0" />
+                            Elevated delivery delay risk due to current weather conditions.
+                          </p>
+                        ) : (
+                          <p className="text-sm text-gray-500">No elevated delivery delay risk for this booking's date and location.</p>
+                        )}
+                      </div>
+                    )}
+                    {paymentState !== 'paid' && (
                       <button
                         onClick={async () => {
                           setPaymentError('')
