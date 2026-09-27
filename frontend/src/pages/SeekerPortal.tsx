@@ -72,6 +72,81 @@ function ListingBrowseCard({ listing, rank, advisoryTag, onNegotiate }: { listin
   )
 }
 
+// Phase 99: real status -> real badge color. Only statuses audit.py and
+// bookings.py actually produce — never an invented label.
+const STATUS_BADGE: Record<string, string> = {
+  confirmed: 'bg-blue-100 text-blue-700',
+  checked_in: 'bg-amber-100 text-amber-700',
+  checked_out: 'bg-green-100 text-green-700',
+  under_review: 'bg-red-100 text-red-700',
+}
+const STATUS_LABEL: Record<string, string> = {
+  confirmed: 'Confirmed',
+  checked_in: 'Checked In',
+  checked_out: 'Checked Out',
+  under_review: 'Under Review',
+}
+
+// Phase 99: upcoming bookings first (soonest first), then past bookings
+// (most recently ended first) below them.
+function sortedBookings(bookings: BookingItem[]): BookingItem[] {
+  const now = Date.now()
+  const upcoming = bookings.filter((b) => new Date(b.starts_at).getTime() >= now)
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
+  const past = bookings.filter((b) => new Date(b.starts_at).getTime() < now)
+    .sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime())
+  return [...upcoming, ...past]
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function BookingCard({ booking: b }: { booking: BookingItem }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const showImage = b.asset_image_path && !imgFailed
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-lavender/20 overflow-hidden">
+      {showImage ? (
+        <img src={listingImageUrl(b.asset_image_path!)} alt={b.asset_title ?? ''}
+          className="w-full h-32 object-cover" onError={() => setImgFailed(true)} />
+      ) : (
+        <div className="w-full h-32 bg-lavender/10 flex items-center justify-center text-xs text-gray-400">No photo available</div>
+      )}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold text-gray-900">{b.asset_title ?? 'Listing'}</h3>
+          <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[b.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            {STATUS_LABEL[b.status] ?? b.status}
+          </span>
+        </div>
+        {b.maps_link ? (
+          <a href={b.maps_link} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-navy hover:underline mt-1 flex items-center gap-1 w-fit">
+            <MapPin size={12} /> {b.asset_address ?? 'View location'}
+          </a>
+        ) : b.asset_address && (
+          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+            <MapPin size={12} /> {b.asset_address}
+          </p>
+        )}
+        <p className="text-xs text-gray-400 mt-2">
+          {formatDateTime(b.starts_at)} – {formatDateTime(b.ends_at)}
+        </p>
+        {b.payment_status === 'paid' && b.provider_display_name && (
+          <div className="mt-2 pt-2 border-t border-gray-50 text-xs text-gray-600">
+            <p className="font-medium text-gray-800">{b.provider_display_name}</p>
+            {b.provider_phone && <p>{b.provider_phone}</p>}
+          </div>
+        )}
+        {b.payment_status !== 'paid' && (
+          <p className="text-xs text-amber-600 mt-2">Provider contact available after payment</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 type SortOption = 'best_match' | 'price_asc' | 'price_desc'
 
 export default function SeekerPortal() {
@@ -202,6 +277,13 @@ export default function SeekerPortal() {
             <button onClick={() => nav('/provider')} className="text-sm text-navy font-medium hover:underline">Provider Portal</button>
           )}
           <button onClick={() => nav('/audit')} className="text-sm text-navy font-medium hover:underline">Visual Audit</button>
+          {/* Phase 100: seeker-only — this page itself is already
+              inaccessible to a pure-provider account (Phase 83's redirect),
+              so no separate role check is needed here. */}
+          {user && (
+            <button onClick={() => document.getElementById('my-bookings')?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-sm text-navy font-medium hover:underline">My Bookings</button>
+          )}
           <span className="text-gray-300">|</span>
           {user ? (
             <span className="text-sm font-semibold text-navy bg-navy/10 px-3 py-1.5 rounded-full">{user.display_name}</span>
@@ -225,43 +307,32 @@ export default function SeekerPortal() {
           </p>
         </motion.div>
 
-        {/* My Bookings — real portfolio of what this seeker has booked */}
-        {user && myBookings.length > 0 && (
-          <div className="mb-8">
+        {/* Phase 99: My Bookings / Portfolio — real per-booking status, real
+            provider contact (once paid), real location link, real photo
+            with a graceful placeholder, sorted upcoming-first. */}
+        {user && (
+          <div id="my-bookings" className="mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">My Bookings</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myBookings.map((b) => (
-                <div key={b.id} className="bg-white rounded-2xl shadow-sm border border-lavender/20 overflow-hidden">
-                  {b.asset_image_path ? (
-                    <img src={listingImageUrl(b.asset_image_path)} alt={b.asset_title ?? ''}
-                      className="w-full h-32 object-cover" />
-                  ) : (
-                    <div className="w-full h-32 bg-lavender/10 flex items-center justify-center text-xs text-gray-400">No photo</div>
-                  )}
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-900">{b.asset_title ?? 'Listing'}</h3>
-                    {b.asset_address && (
-                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                        <MapPin size={12} /> {b.asset_address}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-2">
-                      {new Date(b.starts_at).toLocaleDateString()} – {new Date(b.ends_at).toLocaleDateString()}
-                    </p>
-                    <span className={`inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full ${
-                      b.payment_status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {b.payment_status === 'paid' ? 'Confirmed & Paid' : b.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {myBookings.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-lavender/20 px-6 py-10 text-center">
+                <p className="text-gray-500 mb-2">No bookings yet</p>
+                <button onClick={() => document.getElementById('search-form')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="text-sm text-navy font-medium hover:underline">
+                  Search for a resource to book
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sortedBookings(myBookings).map((b) => (
+                  <BookingCard key={b.id} booking={b} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Search form */}
-        <form onSubmit={search} className="bg-white rounded-2xl shadow-sm border border-lavender/20 p-5 mb-6">
+        <form id="search-form" onSubmit={search} className="bg-white rounded-2xl shadow-sm border border-lavender/20 p-5 mb-6">
           <div className="flex gap-3">
             <div className="flex-1">
               <input

@@ -68,6 +68,9 @@ async def checkin(
         image_path=str(img_path),
     )
     db.add(log)
+    # Phase 98/101: a real status transition, not a fabricated label — the
+    # seeker's Portfolio badge reflects this immediately on refetch.
+    booking.status = "checked_in"
     db.commit()
     db.refresh(log)
     return log
@@ -113,6 +116,10 @@ async def checkout(
         alignment_unavailable=alignment_unavailable,
     )
     db.add(log)
+    # Phase 98/101: a real status transition driven by the real OpenCV
+    # result above — "under_review" only when a genuine change was flagged,
+    # never invented independently of that decision.
+    booking.status = "under_review" if change_detected else "checked_out"
     db.commit()
     db.refresh(log)
 

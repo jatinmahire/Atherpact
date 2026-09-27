@@ -46,6 +46,12 @@ class BookingOut(BaseModel):
     asset_title: Optional[str] = None
     asset_address: Optional[str] = None
     asset_image_path: Optional[str] = None
+    # Phase 98: real listing location link (Phase 36), and provider contact
+    # — the latter only populated once payment_status is "paid", the same
+    # real gate Phase 87 already enforces on its own dedicated endpoint.
+    maps_link: Optional[str] = None
+    provider_display_name: Optional[str] = None
+    provider_phone: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -186,6 +192,17 @@ def list_bookings(
     result = []
     for b in bookings:
         asset = db.get(Asset, b.asset_id)
+
+        # Phase 98: provider contact only once paid — the same real gate
+        # Phase 87 enforces on its own dedicated endpoint, not loosened here
+        # just because this is a list view.
+        provider_display_name = None
+        provider_phone = None
+        if asset and b.payment_status == "paid":
+            provider = db.get(User, asset.owner_id)
+            if provider:
+                provider_display_name, provider_phone = _provider_contact_fallback(asset, provider)
+
         result.append(BookingOut(
             id=b.id,
             asset_id=b.asset_id,
@@ -199,6 +216,9 @@ def list_bookings(
             asset_title=asset.title if asset else None,
             asset_address=asset.address if asset else None,
             asset_image_path=asset.image_path if asset else None,
+            maps_link=asset.maps_link if asset else None,
+            provider_display_name=provider_display_name,
+            provider_phone=provider_phone,
         ))
     return result
 
@@ -340,6 +360,13 @@ class ProviderContactOut(BaseModel):
     contact_phone: str
 
 
+def _provider_contact_fallback(asset: Asset, provider: User) -> tuple[str, str]:
+    """Phase 87's exact display-name-fallback logic, factored out so Phase
+    98's portfolio endpoint reuses it rather than reimplementing it."""
+    display_name = asset.owner_display_name or provider.email.split("@")[0]
+    return display_name, (provider.contact_phone or "Not provided")
+
+
 @router.get("/{booking_id}/provider-contact", response_model=ProviderContactOut)
 def provider_contact(
     booking_id: str,
@@ -365,8 +392,5 @@ def provider_contact(
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    display_name = asset.owner_display_name or provider.email.split("@")[0]
-    return ProviderContactOut(
-        display_name=display_name,
-        contact_phone=provider.contact_phone or "Not provided",
-    )
+    display_name, contact_phone = _provider_contact_fallback(asset, provider)
+    return ProviderContactOut(display_name=display_name, contact_phone=contact_phone)

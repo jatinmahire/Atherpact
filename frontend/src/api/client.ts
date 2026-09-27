@@ -287,6 +287,9 @@ export interface BookingItem {
   asset_title: string | null
   asset_address: string | null
   asset_image_path: string | null
+  maps_link: string | null
+  provider_display_name: string | null
+  provider_phone: string | null
 }
 
 export interface RazorpayOrder {
