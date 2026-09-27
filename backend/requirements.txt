@@ -9,7 +9,9 @@ numpy==1.26.4
 pydantic==2.9.2
 pydantic[email]==2.9.2
 pydantic-settings==2.5.2
-httpx==0.27.2
+httpx==0.28.1  # pinned to match firebase-admin==7.7.0's own requirement (a fresh
+                # resolve conflicts otherwise — surfaced by a clean Docker build,
+                # not visible in an incrementally-installed local venv)
 pillow==10.4.0
 faiss-cpu==1.9.0.post1
 
