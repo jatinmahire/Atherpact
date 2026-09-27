@@ -58,7 +58,6 @@ const WHY = [
   { title: 'Fair Negotiation', desc: 'A transparent ZOPA formula sets the price — pure arithmetic, never a black box.' },
   { title: 'Trusted Transactions', desc: 'Real Razorpay payments with server-side signature verification, never a client-side shortcut.' },
   { title: 'Visual Verification', desc: 'OpenCV compares check-in and check-out photos for real structural change, not lighting.' },
-  { title: 'Offline-first AI', desc: 'Every model runs locally on one machine — no cloud AI call in the matching or negotiation path.' },
 ]
 
 
@@ -298,12 +297,14 @@ export default function Landing() {
               >
                 Find a Resource <ArrowRight size={18} />
               </button>
-              <button
-                onClick={() => nav('/provider')}
-                className="border border-warm-white/40 text-warm-white px-6 py-3 rounded-full font-semibold hover:bg-warm-white/10 transition-colors"
-              >
-                List Your Resource
-              </button>
+              {user?.role !== 'seeker' && (
+                <button
+                  onClick={() => nav('/provider')}
+                  className="border border-warm-white/40 text-warm-white px-6 py-3 rounded-full font-semibold hover:bg-warm-white/10 transition-colors"
+                >
+                  List Your Resource
+                </button>
+              )}
             </motion.div>
           </motion.div>
         </div>
@@ -366,7 +367,7 @@ export default function Landing() {
 
         {/* Statistics — labeled honestly as demo/example unless real */}
         <FadeInSection className="max-w-6xl mx-auto px-4 sm:px-8 py-16">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div>
               <div className="font-display text-4xl text-brass">5</div>
               <p className="text-ink/50 text-xs mt-1">resource categories</p>
@@ -378,10 +379,6 @@ export default function Landing() {
             <div>
               <div className="font-display text-4xl text-brass">0.5/0.3/0.2</div>
               <p className="text-ink/50 text-xs mt-1">real match-score weights</p>
-            </div>
-            <div>
-              <div className="font-display text-4xl text-brass">100%</div>
-              <p className="text-ink/50 text-xs mt-1">offline-first AI</p>
             </div>
           </div>
           <p className="text-ink/40 text-xs text-center mt-6">*Illustrative example, not a live company-wide statistic.</p>
@@ -395,9 +392,11 @@ export default function Landing() {
               <button onClick={() => nav('/seeker')} className="bg-brass text-espresso px-6 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity">
                 Find a Resource
               </button>
-              <button onClick={() => nav('/provider')} className="border border-warm-white/40 text-warm-white px-6 py-3 rounded-full font-semibold hover:bg-warm-white/10 transition-colors">
-                List Your Resource
-              </button>
+              {user?.role !== 'seeker' && (
+                <button onClick={() => nav('/provider')} className="border border-warm-white/40 text-warm-white px-6 py-3 rounded-full font-semibold hover:bg-warm-white/10 transition-colors">
+                  List Your Resource
+                </button>
+              )}
             </div>
           </div>
         </FadeInSection>

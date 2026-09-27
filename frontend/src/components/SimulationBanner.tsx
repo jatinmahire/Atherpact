@@ -1,8 +1,8 @@
 /**
- * AetherPact — Addendum 10, Phase 73: persistent global banner shown
- * anywhere in the app whenever Simulation Mode is active. Purely a
- * display toggle — never writes to the database, never affects any real
- * booking, listing, or price record.
+ * AetherPact — Addendum 10, Phase 73: a brief toast shown whenever
+ * Simulation Mode turns on or switches scenario. Purely a display toggle —
+ * never writes to the database, never affects any real booking, listing,
+ * or price record.
  */
 import { useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
@@ -13,24 +13,34 @@ const SCENARIO_LABELS: Record<string, string> = {
   heat_wave: 'Heat Wave',
 }
 
+const VISIBLE_MS = 3500
+
 export default function SimulationBanner() {
   const [mode, setMode] = useState(simulationStore.getMode())
+  const [visible, setVisible] = useState(false)
+
   useEffect(() => simulationStore.subscribe(() => setMode(simulationStore.getMode())), [])
 
-  if (!mode) return null
+  // Re-show the toast every time simulation mode turns on or the active
+  // scenario changes, then auto-dismiss — it never lingers as a permanent bar.
+  useEffect(() => {
+    if (!mode) { setVisible(false); return }
+    setVisible(true)
+    const timer = setTimeout(() => setVisible(false), VISIBLE_MS)
+    return () => clearTimeout(timer)
+  }, [mode])
+
+  if (!mode || !visible) return null
 
   return (
-    // sticky, not fixed: this must occupy real layout space so it pushes
-    // every page's own nav down instead of overlapping and blocking clicks
-    // on it (found live, during Phase 77 verification).
-    <div className="sticky top-0 left-0 right-0 z-[200] bg-wine text-warm-white text-xs sm:text-sm px-4 py-2 flex items-center justify-center gap-3 shadow-md">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-wine text-warm-white text-xs sm:text-sm px-4 py-2.5 rounded-full flex items-center gap-3 shadow-lg">
       <AlertTriangle size={14} className="shrink-0" />
       <span>
         <span className="font-semibold">Simulation Mode: {SCENARIO_LABELS[mode]}</span> — showing projected effects, not live data
       </span>
       <button
         onClick={() => simulationStore.setMode(null)}
-        className="ml-2 underline font-medium hover:text-brass transition-colors shrink-0"
+        className="ml-1 underline font-medium hover:text-brass transition-colors shrink-0"
       >
         Return to Live
       </button>
