@@ -4,7 +4,10 @@ sqlalchemy==2.0.35
 python-multipart==0.0.12
 sentence-transformers==3.1.1
 llama-cpp-python==0.3.2
-opencv-python==4.10.0.84
+opencv-python-headless==4.10.0.84  # headless: no libGL.so.1 dependency (this
+                                    # backend never uses cv2's GUI functions —
+                                    # confirmed a real ImportError in the slim
+                                    # Docker image with the full opencv-python)
 numpy==1.26.4
 pydantic==2.9.2
 pydantic[email]==2.9.2
