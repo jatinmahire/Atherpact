@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db, Negotiation, Asset, DecisionFlag, User
-from models import NegotiateRequest, NegotiateResponse, SmartSuggestionOut
+from models import NegotiateRequest, NegotiateResponse, SmartSuggestionOut, NegotiationFloorOut
 from routers.auth import get_current_user
 from services.negotiator import zopa_solve, zopa_solve_multi_round
 from services.llm_service import phrase_settlement
@@ -44,6 +44,19 @@ def pricing_suggestion(
     return suggested_rate(db, asset, provider_ask, starts_at, simulation)
 
 
+@router.get("/floor/{asset_id}", response_model=NegotiationFloorOut)
+def negotiation_floor(asset_id: str, db: Session = Depends(get_db)):
+    """
+    Phase 113: the real, per-listing negotiation floor — fetched only here,
+    in the negotiation context, never included in the public listing/search
+    response (ListingOut has no provider_min field at all).
+    """
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return NegotiationFloorOut(provider_ask=asset.price_per_day, provider_min=asset.provider_min)
+
+
 @router.get("/smart-suggestion/{asset_id}", response_model=SmartSuggestionOut)
 def smart_suggestion(asset_id: str, db: Session = Depends(get_db)):
     """
@@ -70,6 +83,16 @@ def negotiate(
     asset = db.get(Asset, req.asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Phase 114: the real server-side floor check, against the asset's own
+    # stored provider_min — never the client-submitted req.provider_min,
+    # since a direct API call could set that to anything. This must reject
+    # before the request ever reaches the ZOPA solver.
+    if req.seeker_offer < asset.provider_min:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Your offer must be at least ₹{asset.provider_min:,.0f} for this listing.",
+        )
 
     rounds_log = None
     if req.multi_round:

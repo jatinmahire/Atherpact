@@ -83,6 +83,7 @@ export interface ListingCreatePayload {
   description: string
   category: string
   price_per_day: number
+  provider_min: number
   address: string
   capacity: number | null
   lat?: number
@@ -253,6 +254,11 @@ export const negotiateAPI = {
 
   smartSuggestion: (assetId: string) =>
     api.get<SmartSuggestion>(`/negotiate/smart-suggestion/${assetId}`),
+
+  // Phase 113: the real per-listing negotiation floor — fetched only here,
+  // never present on the Listing type used by search/listing pages.
+  getFloor: (assetId: string) =>
+    api.get<{ provider_ask: number; provider_min: number }>(`/negotiate/floor/${assetId}`),
 
   // Addendum 10, Phase 74: a real, honestly-new pricing-suggestion feature
   // (no equivalent existed before this phase) with a real weather_multiplier

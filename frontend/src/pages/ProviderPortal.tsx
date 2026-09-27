@@ -272,7 +272,7 @@ export default function ProviderPortal() {
 
   const [form, setForm] = useState({
     title: '', description: '', category: 'banquet_hall',
-    price_per_day: '', address: '', capacity: '', maps_link: '', owner_display_name: '',
+    price_per_day: '', provider_min: '', address: '', capacity: '', maps_link: '', owner_display_name: '',
     listing_contact_phone: '',
   })
   // Phase 102: prefill from the account-level number the moment it's known
@@ -285,6 +285,7 @@ export default function ProviderPortal() {
   // Addendum 5: a real photo is required for every new listing.
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoError, setPhotoError] = useState('')
+  const [priceError, setPriceError] = useState('')
   // Phase 36 (Addendum 4): coordinates are never raw-typed — only captured
   // via the browser's own geolocation, kept out of the visible form entirely.
   const [geoCoords, setGeoCoords] = useState<{ lat: number; lon: number } | null>(null)
@@ -367,8 +368,17 @@ export default function ProviderPortal() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setPhotoError('')
+    setPriceError('')
     if (!photoFile) {
       setPhotoError('A photo of the resource is required.')
+      return
+    }
+    // Phase 112: real client-side floor validation, mirroring the backend's
+    // own model_validator — the same rule enforced twice, not duplicated logic.
+    const pricePerDay = parseFloat(form.price_per_day)
+    const providerMin = parseFloat(form.provider_min)
+    if (!(providerMin > 0) || providerMin > pricePerDay) {
+      setPriceError('Minimum acceptable price cannot exceed the asking price.')
       return
     }
     setSubmitting(true)
@@ -377,7 +387,8 @@ export default function ProviderPortal() {
         title: form.title,
         description: form.description,
         category: form.category,
-        price_per_day: parseFloat(form.price_per_day),
+        price_per_day: pricePerDay,
+        provider_min: providerMin,
         address: form.address,
         capacity: form.capacity ? parseInt(form.capacity) : null,
         // A pasted maps link takes priority server-side; geolocation is the fallback.
@@ -390,7 +401,7 @@ export default function ProviderPortal() {
       setSuccess(true)
       setShowForm(false)
       setForm({
-        title: '', description: '', category: 'banquet_hall', price_per_day: '', address: '', capacity: '', maps_link: '', owner_display_name: '',
+        title: '', description: '', category: 'banquet_hall', price_per_day: '', provider_min: '', address: '', capacity: '', maps_link: '', owner_display_name: '',
         // Next listing still prefills from the account number, not blank.
         listing_contact_phone: user?.contact_phone ?? '',
       })
@@ -556,6 +567,15 @@ export default function ProviderPortal() {
                     <input type="number" value={form.price_per_day} onChange={update('price_per_day')} required min={1}
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
                       placeholder="25000" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Acceptable Price (₹)</label>
+                    <input type="number" value={form.provider_min} onChange={update('provider_min')} required min={1}
+                      max={form.price_per_day || undefined}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
+                      placeholder="18750" />
+                    <p className="text-xs text-gray-400 mt-1">The real floor a seeker's offer can never go below in negotiation.</p>
+                    {priceError && <p className="text-xs text-red-600 mt-1">{priceError}</p>}
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>

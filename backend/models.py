@@ -5,7 +5,7 @@ AetherPact — Pydantic request/response models (shared across routers).
 from __future__ import annotations
 import re
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from datetime import datetime
 
 # Phase 85: a real phone number, loosely — an optional leading +, then 7-15
@@ -58,6 +58,10 @@ class ListingCreate(BaseModel):
     description: str
     category: str
     price_per_day: float = Field(gt=0)
+    # Phase 112: the real, required negotiation floor for this listing —
+    # never optional, never defaulted silently. Validated below to never
+    # exceed price_per_day (the asking price / ceiling).
+    provider_min: float = Field(gt=0)
     address: str
     capacity: Optional[int] = None
     # Phase 36 (Addendum 4): never raw-typed. Either browser geolocation
@@ -76,6 +80,12 @@ class ListingCreate(BaseModel):
     listing_contact_phone: str
 
     _validate_listing_contact_phone = field_validator("listing_contact_phone")(_validate_phone)
+
+    @model_validator(mode="after")
+    def _validate_price_floor(self) -> "ListingCreate":
+        if self.provider_min > self.price_per_day:
+            raise ValueError("Minimum acceptable price cannot exceed the asking price")
+        return self
 
 
 class ListingOut(BaseModel):
@@ -167,6 +177,14 @@ class MatchResponse(BaseModel):
 
 
 # ── Negotiate ─────────────────────────────────────────────────────────────────
+
+class NegotiationFloorOut(BaseModel):
+    """Phase 113: the real per-listing negotiation floor, fetched only in
+    the negotiation context — never included in ListingOut (search/listing
+    pages)."""
+    provider_ask: float
+    provider_min: float
+
 
 class NegotiateRequest(BaseModel):
     asset_id: str

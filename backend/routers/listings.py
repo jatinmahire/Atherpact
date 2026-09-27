@@ -73,6 +73,7 @@ def create_listing(
         description=req.description,
         category=req.category,
         price_per_day=req.price_per_day,
+        provider_min=req.provider_min,
         lat=location["lat"],
         lon=location["lon"],
         maps_link=location["maps_link"],

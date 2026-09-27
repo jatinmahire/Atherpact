@@ -85,6 +85,11 @@ class Asset(Base):
     description   = Column(Text, nullable=False)
     category      = Column(String, nullable=False)          # e.g. "banquet_hall"
     price_per_day = Column(Float, nullable=False)
+    # Phase 112: the real minimum acceptable price for THIS listing, set once
+    # by the provider — the negotiation floor Phase 114 enforces server-side.
+    # Never exposed on ListingOut (search/listing pages); only ever read
+    # through the dedicated negotiation-floor endpoint.
+    provider_min  = Column(Float, nullable=False)
     # Phase 36 (Addendum 4): auto-populated only, never a raw human-typed
     # value — nullable because a pasted/short link may fail to resolve.
     lat           = Column(Float, nullable=True)
@@ -452,6 +457,7 @@ def seed_database(db: Session) -> None:
                 **data,
                 "maps_link": f"https://www.google.com/maps?q={data['lat']},{data['lon']}",
                 "listing_contact_phone": "+919876543210",
+                "provider_min": round(data["price_per_day"] * 0.75, 2),
             }
             db.add(Asset(**data))
 

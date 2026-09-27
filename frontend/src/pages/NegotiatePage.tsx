@@ -135,6 +135,18 @@ export default function NegotiatePage({ item, onClose }: Props) {
   const [multiRound, setMultiRound] = useState(false)
   const [smartSuggestion, setSmartSuggestion] = useState<SmartSuggestion | null>(null)
 
+  // Phase 113: the real, per-listing negotiation floor — fetched from the
+  // dedicated endpoint, never assumed from a 0.75-of-price guess. The
+  // Provider Minimum field below is locked to this real value once known.
+  const [realFloor, setRealFloor] = useState<number | null>(null)
+  const [floorPopup, setFloorPopup] = useState('')
+  useEffect(() => {
+    negotiateAPI.getFloor(asset.id).then((res) => {
+      setRealFloor(res.data.provider_min)
+      setForm((p) => ({ ...p, provider_min: String(res.data.provider_min) }))
+    }).catch(() => {})
+  }, [asset.id])
+
   // Addendum 10, Phases 74 & 76: a real, honestly-new pricing-suggestion
   // feature with a real weather_multiplier, re-fetched whenever the
   // provider's ask, the chosen dates, or the global Simulation Mode
@@ -189,6 +201,14 @@ export default function NegotiatePage({ item, onClose }: Props) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Phase 113: real client-side guard, before this ever reaches the
+    // network — the backend enforces the exact same real floor
+    // independently (Phase 114), this is just the fast, clear popup path.
+    const offer = parseFloat(form.seeker_offer)
+    if (realFloor != null && offer < realFloor) {
+      setFloorPopup(`Your offer must be at least ₹${realFloor.toLocaleString('en-IN')} for this listing.`)
+      return
+    }
     setLoading(true)
     setError('')
     try {
@@ -203,7 +223,14 @@ export default function NegotiatePage({ item, onClose }: Props) {
       })
       setResult(res.data)
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Negotiation failed')
+      // A direct/bypassed request still gets the real backend rejection
+      // (Phase 114) — surfaced here as the same popup, not a generic banner.
+      const detail = err?.response?.data?.detail
+      if (err?.response?.status === 422 && typeof detail === 'string' && detail.includes('Your offer must be at least')) {
+        setFloorPopup(detail)
+      } else {
+        setError(detail ?? 'Negotiation failed')
+      }
     } finally {
       setLoading(false)
     }
@@ -267,8 +294,9 @@ export default function NegotiatePage({ item, onClose }: Props) {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Provider Minimum (₹/day)</label>
-                  <input type="number" value={form.provider_min} onChange={update('provider_min')} required
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-navy" />
+                  <input type="number" value={form.provider_min} readOnly required
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+                  <p className="text-[11px] text-gray-400 mt-1">The real floor this provider set — fixed, not editable here.</p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Seeker Offer (₹/day)</label>
@@ -545,6 +573,31 @@ export default function NegotiatePage({ item, onClose }: Props) {
           )}
         </div>
       </motion.div>
+
+      {/* Phase 113: the real, clear popup — the exact real provider_min
+          number, never a generic placeholder message. */}
+      <AnimatePresence>
+        {floorPopup && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
+            onClick={(e) => e.target === e.currentTarget && setFloorPopup('')}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm text-center"
+            >
+              <AlertTriangle size={28} className="text-amber-500 mx-auto mb-3" />
+              <p className="font-semibold text-gray-900 mb-1">Offer too low</p>
+              <p className="text-sm text-gray-600 mb-5">{floorPopup}</p>
+              <button onClick={() => setFloorPopup('')}
+                className="w-full bg-navy text-espresso py-2 rounded-xl font-semibold text-sm hover:bg-navy-light transition-colors">
+                OK
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
