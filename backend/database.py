@@ -100,6 +100,10 @@ class Asset(Base):
     # listings may have a different on-site contact per item) — distinct
     # from the account-level contact_phone on User. Null when skipped.
     owner_display_name = Column(String, nullable=True)
+    # Phase 102: required, listing-specific contact number — what a seeker's
+    # booking actually shows, never the account-level contact_phone
+    # directly (that's only the defensive fallback, Phase 103).
+    listing_contact_phone = Column(String, nullable=False)
     is_active     = Column(Boolean, default=True)
     created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -442,7 +446,13 @@ def seed_database(db: Session) -> None:
         if not db.get(Asset, data["id"]):
             # Phase 36 (Addendum 4): seed fixtures already have real lat/lon,
             # so derive the same display link create_listing would build.
-            data = {**data, "maps_link": f"https://www.google.com/maps?q={data['lat']},{data['lon']}"}
+            # Phase 102: seed listings prefill from the seed provider's own
+            # account-level number, same as the real create-listing form does.
+            data = {
+                **data,
+                "maps_link": f"https://www.google.com/maps?q={data['lat']},{data['lon']}",
+                "listing_contact_phone": "+919876543210",
+            }
             db.add(Asset(**data))
 
     db.commit()

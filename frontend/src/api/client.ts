@@ -66,6 +66,7 @@ export interface Listing {
   capacity: number | null
   image_path: string | null
   owner_display_name: string | null
+  listing_contact_phone: string | null
   is_active: boolean
   created_at: string
   owner_verified: boolean
@@ -88,6 +89,7 @@ export interface ListingCreatePayload {
   lon?: number
   maps_link?: string
   owner_display_name?: string
+  listing_contact_phone: string
 }
 
 export interface ReferralStatus {

@@ -70,6 +70,12 @@ class ListingCreate(BaseModel):
     # Phase 86: optional per-listing contact name, distinct from the
     # account-level contact_phone — null/blank if the provider skips it.
     owner_display_name: Optional[str] = None
+    # Phase 102: required, listing-specific contact number — prefilled on
+    # the frontend from the provider's account-level contact_phone, but
+    # editable and validated the same way (same rule as Phase 85).
+    listing_contact_phone: str
+
+    _validate_listing_contact_phone = field_validator("listing_contact_phone")(_validate_phone)
 
 
 class ListingOut(BaseModel):
@@ -86,6 +92,7 @@ class ListingOut(BaseModel):
     capacity: Optional[int]
     image_path: Optional[str] = None
     owner_display_name: Optional[str] = None
+    listing_contact_phone: Optional[str] = None
     is_active: bool
     created_at: datetime
     owner_verified: bool = False  # Phase 15 (Addendum 2): true only if owner has a real verified_at

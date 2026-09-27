@@ -362,9 +362,15 @@ class ProviderContactOut(BaseModel):
 
 def _provider_contact_fallback(asset: Asset, provider: User) -> tuple[str, str]:
     """Phase 87's exact display-name-fallback logic, factored out so Phase
-    98's portfolio endpoint reuses it rather than reimplementing it."""
+    98's portfolio endpoint reuses it rather than reimplementing it.
+    Phase 103: the phone number is this specific listing's own
+    listing_contact_phone (Phase 102) — the account-level contact_phone is
+    only a defensive fallback for a pre-Phase-102 listing that somehow has
+    no value (Phase 104's backfill means this shouldn't happen going
+    forward)."""
     display_name = asset.owner_display_name or provider.email.split("@")[0]
-    return display_name, (provider.contact_phone or "Not provided")
+    phone = asset.listing_contact_phone or provider.contact_phone or "Not provided"
+    return display_name, phone
 
 
 @router.get("/{booking_id}/provider-contact", response_model=ProviderContactOut)

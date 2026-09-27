@@ -273,7 +273,15 @@ export default function ProviderPortal() {
   const [form, setForm] = useState({
     title: '', description: '', category: 'banquet_hall',
     price_per_day: '', address: '', capacity: '', maps_link: '', owner_display_name: '',
+    listing_contact_phone: '',
   })
+  // Phase 102: prefill from the account-level number the moment it's known
+  // (auth restores asynchronously), without ever overwriting an in-progress edit.
+  useEffect(() => {
+    if (user?.contact_phone) {
+      setForm((prev) => prev.listing_contact_phone ? prev : { ...prev, listing_contact_phone: user.contact_phone! })
+    }
+  }, [user?.contact_phone])
   // Addendum 5: a real photo is required for every new listing.
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoError, setPhotoError] = useState('')
@@ -376,11 +384,16 @@ export default function ProviderPortal() {
         ...(form.maps_link.trim() ? { maps_link: form.maps_link.trim() } : {}),
         ...(geoCoords ? { lat: geoCoords.lat, lon: geoCoords.lon } : {}),
         ...(form.owner_display_name.trim() ? { owner_display_name: form.owner_display_name.trim() } : {}),
+        listing_contact_phone: form.listing_contact_phone.trim(),
       })
       await listingsAPI.uploadImage(created.data.id, photoFile)
       setSuccess(true)
       setShowForm(false)
-      setForm({ title: '', description: '', category: 'banquet_hall', price_per_day: '', address: '', capacity: '', maps_link: '', owner_display_name: '' })
+      setForm({
+        title: '', description: '', category: 'banquet_hall', price_per_day: '', address: '', capacity: '', maps_link: '', owner_display_name: '',
+        // Next listing still prefills from the account number, not blank.
+        listing_contact_phone: user?.contact_phone ?? '',
+      })
       setGeoCoords(null)
       setGeoStatus('idle')
       setSafetyNote(null)
@@ -596,6 +609,20 @@ export default function ProviderPortal() {
                     <input value={form.owner_display_name} onChange={update('owner_display_name')}
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
                       placeholder="Leave blank to use your account name" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Listing Contact Number</label>
+                    <input
+                      type="tel"
+                      value={form.listing_contact_phone}
+                      onChange={update('listing_contact_phone')}
+                      required
+                      pattern="^\+?[\d\s\-()]{7,15}$"
+                      title="Enter a valid phone number (7-15 digits, optional +country code)"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-navy"
+                      placeholder="+91 98765 43210"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Prefilled from your account — edit if this listing has a different contact.</p>
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">

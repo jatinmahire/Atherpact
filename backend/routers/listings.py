@@ -79,6 +79,7 @@ def create_listing(
         address=req.address,
         capacity=req.capacity,
         owner_display_name=(req.owner_display_name or None),
+        listing_contact_phone=req.listing_contact_phone,
         is_active=True,
     )
     db.add(asset)
