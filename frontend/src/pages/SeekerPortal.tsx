@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Loader2, MapPin, LocateFixed, CloudRain } from 'lucide-react'
+import { Search, Loader2, MapPin, LocateFixed, CloudRain, Check } from 'lucide-react'
 import { matchAPI, listingsAPI, weatherTwinAPI } from '../api/client'
 import type { MatchResultItem, Listing, WeatherTwinListing } from '../api/client'
 import { authStore } from '../store/auth'
@@ -15,14 +15,8 @@ import { deriveAdvisoryTag } from '../lib/weatherAdvisory'
 import MatchCard from '../components/MatchCard'
 import { SkeletonList } from '../components/SkeletonCard'
 import NegotiatePage from './NegotiatePage'
+import { CategoryIcon, CATEGORY_LABELS } from '../lib/categoryIcons'
 
-const CATEGORY_LABELS: Record<string, string> = {
-  banquet_hall: '🏛️ Banquet Hall',
-  commercial_kitchen: '🍳 Commercial Kitchen',
-  av_equipment: '🎤 AV Equipment',
-  transportation: '🚐 Transportation',
-  event_space: '🌆 Event Space',
-}
 
 /** Plain listing card for the default "browse all" view — no match score,
  * since no search query has been run. Never fabricates a score to fill
@@ -37,7 +31,8 @@ function ListingBrowseCard({ listing, rank, advisoryTag, onNegotiate }: { listin
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <span className="text-xs px-2 py-0.5 rounded-full bg-lavender/30 text-navy font-medium">
+          <span className="flex items-center gap-1 w-fit text-xs px-2 py-0.5 rounded-full bg-lavender/30 text-navy font-medium">
+            <CategoryIcon category={listing.category} size={12} />
             {CATEGORY_LABELS[listing.category] ?? listing.category}
           </span>
           <h3 className="font-semibold text-gray-900 text-lg leading-tight mt-1 cursor-pointer hover:text-navy transition-colors"
@@ -247,7 +242,9 @@ export default function SeekerPortal() {
             </button>
           </div>
           {geoStatus === 'success' && (
-            <p className="text-xs text-green-600 mt-2">Using your current location to rank results by distance ✓</p>
+            <p className="flex items-center gap-1 text-xs text-green-600 mt-2">
+              <Check size={13} /> Using your current location to rank results by distance
+            </p>
           )}
           {geoStatus === 'error' && (
             <p className="text-xs text-amber-600 mt-2">Couldn't get your location — search still works, just without distance ranking.</p>

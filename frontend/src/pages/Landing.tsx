@@ -176,6 +176,23 @@ function FadeInSection({ className, children }: { className?: string; children: 
   )
 }
 
+// Same restrained fade, but for one item inside an already-animated
+// section — `index` staggers each item's start slightly so a row of cards
+// or steps settles in left-to-right/top-to-bottom instead of all at once.
+function FadeInItem({ className, index = 0, children }: { className?: string; index?: number; children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.4 }}
+      transition={{ duration: 0.4, ease: 'easeOut', delay: index * 0.08 }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
 export default function Landing() {
   const nav = useNavigate()
   const [user, setUser] = useState(authStore.getUser())
@@ -329,13 +346,13 @@ export default function Landing() {
           <h2 className="font-display text-3xl mb-10">How AetherPact Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-10">
             {STEPS.map((s, i) => (
-              <div key={s.title} className="flex gap-4">
+              <FadeInItem key={s.title} index={i} className="flex gap-4">
                 <span className="font-display text-3xl text-brass shrink-0 w-10">{i + 1}</span>
                 <div>
                   <h3 className="font-semibold text-ink mb-1">{s.title}</h3>
                   <p className="text-ink/60 text-sm leading-relaxed">{s.desc}</p>
                 </div>
-              </div>
+              </FadeInItem>
             ))}
           </div>
         </FadeInSection>
@@ -345,11 +362,11 @@ export default function Landing() {
           <div>
             <h2 className="font-display text-3xl mb-10">Why AetherPact</h2>
             <div className="space-y-8">
-              {WHY.map((w) => (
-                <div key={w.title} className="border-l-2 border-brass pl-5">
+              {WHY.map((w, i) => (
+                <FadeInItem key={w.title} index={i} className="border-l-2 border-brass pl-5">
                   <h3 className="font-semibold text-ink mb-1">{w.title}</h3>
                   <p className="text-ink/60 text-sm leading-relaxed max-w-lg">{w.desc}</p>
-                </div>
+                </FadeInItem>
               ))}
             </div>
           </div>

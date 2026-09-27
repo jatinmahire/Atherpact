@@ -41,7 +41,10 @@ function popupHtml(item: WeatherTwinListing): string {
   const w = item.weather
   const reasoning = item.reasoning
     ? `<p style="margin:6px 0 0;font-size:12px;color:#374151;">${item.reasoning}</p>
-       <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">✦ Powered by Nugen Domain-Aligned AI</p>`
+       <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;display:flex;align-items:center;gap:4px;">
+         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+         Powered by Nugen Domain-Aligned AI
+       </p>`
     : `<p style="margin:6px 0 0;font-size:11px;color:#9ca3af;">Domain insight temporarily unavailable.</p>`
   return `
     <div style="min-width:220px;font-family:inherit;">

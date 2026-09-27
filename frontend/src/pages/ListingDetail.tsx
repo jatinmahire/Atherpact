@@ -20,11 +20,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import ErrorState from '../components/ErrorState'
 import NegotiatePage from './NegotiatePage'
-
-const CATEGORY_ICON: Record<string, string> = {
-  banquet_hall: '🏛️', commercial_kitchen: '🍳', av_equipment: '🎤',
-  transportation: '🚐', event_space: '🌆',
-}
+import { CategoryIcon } from '../lib/categoryIcons'
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export default function ListingDetail() {
@@ -85,8 +81,8 @@ export default function ListingDetail() {
             <img src={listingImageUrl(listing.image_path)} alt={listing.title}
               className="w-full h-56 rounded-2xl object-cover mb-6" />
           ) : (
-            <div className="w-full h-56 rounded-2xl bg-lavender/20 flex items-center justify-center text-7xl mb-6">
-              {CATEGORY_ICON[listing.category] ?? '📦'}
+            <div className="w-full h-56 rounded-2xl bg-lavender/20 flex items-center justify-center mb-6">
+              <CategoryIcon category={listing.category} size={64} className="text-navy/40" />
             </div>
           )}
 
@@ -162,7 +158,9 @@ export default function ListingDetail() {
                     onClick={() => nav(`/listing/${b.asset_id}`)}
                     className="text-left bg-white rounded-xl border border-lavender/20 px-3 py-2 hover:shadow-sm transition-shadow"
                   >
-                    <span className="text-sm font-medium text-gray-900">{CATEGORY_ICON[b.category] ?? '📦'} {b.title}</span>
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
+                      <CategoryIcon category={b.category} size={14} className="shrink-0" /> {b.title}
+                    </span>
                     <span className="block text-xs text-gray-400 mt-0.5">
                       Booked together {b.co_occurrence_count} time{b.co_occurrence_count !== 1 ? 's' : ''}
                     </span>

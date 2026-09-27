@@ -43,9 +43,14 @@ const RISK_COLORS: Record<string, string> = {
   high_risk:   'bg-red-100 text-red-700 border-red-200',
 }
 const RISK_LABELS: Record<string, string> = {
-  low_risk:    '✅ Low Dispute Risk',
-  medium_risk: '⚠️ Medium Dispute Risk',
-  high_risk:   '🔴 High Dispute Risk',
+  low_risk:    'Low Dispute Risk',
+  medium_risk: 'Medium Dispute Risk',
+  high_risk:   'High Dispute Risk',
+}
+const RISK_ICONS: Record<string, typeof CheckCircle2> = {
+  low_risk:    CheckCircle2,
+  medium_risk: AlertTriangle,
+  high_risk:   XCircle,
 }
 
 // Addendum 5: real, seeker-picked start/end date+time instead of a
@@ -349,13 +354,16 @@ export default function NegotiatePage({ item, onClose }: Props) {
 
                     {/* ── ADVISORY SECTION ── */}
                     <div className="space-y-3">
-                      {result.dispute_risk_badge && (
-                        <div className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-xl border ${RISK_COLORS[result.dispute_risk_badge]}`}>
-                          <AlertTriangle size={13} />
-                          <span>{RISK_LABELS[result.dispute_risk_badge]}</span>
-                          <span className="ml-auto opacity-60">Advisory · Laya</span>
-                        </div>
-                      )}
+                      {result.dispute_risk_badge && (() => {
+                        const RiskIcon = RISK_ICONS[result.dispute_risk_badge]
+                        return (
+                          <div className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-xl border ${RISK_COLORS[result.dispute_risk_badge]}`}>
+                            <RiskIcon size={13} />
+                            <span>{RISK_LABELS[result.dispute_risk_badge]}</span>
+                            <span className="ml-auto opacity-60">Advisory · Laya</span>
+                          </div>
+                        )
+                      })()}
                       {result.llm_phrasing && (
                         <div className="bg-lavender/10 border border-lavender/30 rounded-xl px-4 py-3 text-sm text-gray-700">
                           <div className="flex items-center gap-1.5 mb-1.5 text-xs text-gray-400 font-medium">

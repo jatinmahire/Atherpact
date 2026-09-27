@@ -9,14 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, MapPin, Cpu, BadgeCheck, CloudRain } from 'lucide-react'
 import type { MatchResultItem } from '../api/client'
-
-const CATEGORY_LABELS: Record<string, string> = {
-  banquet_hall: '🏛️ Banquet Hall',
-  commercial_kitchen: '🍳 Commercial Kitchen',
-  av_equipment: '🎤 AV Equipment',
-  transportation: '🚐 Transportation',
-  event_space: '🌆 Event Space',
-}
+import { CategoryIcon, CATEGORY_LABELS } from '../lib/categoryIcons'
 
 interface Props {
   item: MatchResultItem
@@ -70,7 +63,8 @@ export default function MatchCard({ item, rank, advisoryTag, onNegotiate }: Prop
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold text-gray-400">#{rank + 1}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-lavender/30 text-navy font-medium">
+              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-lavender/30 text-navy font-medium">
+                <CategoryIcon category={asset.category} size={12} />
                 {CATEGORY_LABELS[asset.category] ?? asset.category}
               </span>
               {asset.owner_verified && (

@@ -214,12 +214,12 @@ function defaultAvailabilityWindow() {
 }
 
 const CATEGORIES = [
-  { value: 'banquet_hall',      label: '🏛️ Banquet Hall' },
-  { value: 'commercial_kitchen', label: '🍳 Commercial Kitchen' },
-  { value: 'av_equipment',      label: '🎤 AV & Event Equipment' },
-  { value: 'transportation',    label: '🚐 Transportation / Fleet' },
-  { value: 'event_space',       label: '🌆 Rooftop / Event Space' },
-  { value: 'other',             label: '📦 Other' },
+  { value: 'banquet_hall',      label: 'Banquet Hall' },
+  { value: 'commercial_kitchen', label: 'Commercial Kitchen' },
+  { value: 'av_equipment',      label: 'AV & Event Equipment' },
+  { value: 'transportation',    label: 'Transportation / Fleet' },
+  { value: 'event_space',       label: 'Rooftop / Event Space' },
+  { value: 'other',             label: 'Other' },
 ]
 
 interface SafetyNote {
@@ -567,7 +567,9 @@ export default function ProviderPortal() {
                       </button>
                     </div>
                     {geoStatus === 'success' && (
-                      <p className="text-xs text-green-600 mt-1">Current location captured ✓</p>
+                      <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
+                        <CheckCircle size={13} /> Current location captured
+                      </p>
                     )}
                     {geoStatus === 'error' && (
                       <p className="text-xs text-amber-600 mt-1">Couldn't get your location — paste a Maps link instead, or leave blank and add it later.</p>
