@@ -12,6 +12,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# CPU-only torch, installed BEFORE requirements.txt, so sentence-transformers
+# (a transitive dependency) finds torch already satisfied and never pulls in
+# the default GPU build — which drags in several GB of unused NVIDIA CUDA
+# libraries (confirmed: this caused a real "no space left on device" build
+# failure on a 30GB volume). This backend only ever runs CPU inference.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
 # Dependencies first, so this layer only rebuilds when requirements.txt
 # actually changes, not on every code edit.
 COPY requirements.txt .
