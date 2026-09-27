@@ -295,6 +295,20 @@ class Referral(Base):
     created_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class SocialSignalLog(Base):
+    """Phase 92: an append-only record of each real Weather Digital Twin
+    signal fetch (Phase 91's combined Mastodon + GDELT count) for a city,
+    so a real volume trend becomes visible as it accumulates over time —
+    never a fabricated historical row."""
+    __tablename__ = "social_signal_logs"
+    id              = Column(String, primary_key=True)
+    city            = Column(String, nullable=False)
+    fetched_at      = Column(DateTime, nullable=False)
+    combined_count  = Column(Integer, nullable=False)
+    mastodon_count  = Column(Integer, nullable=False)
+    gdelt_count     = Column(Integer, nullable=False)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Seed Data (5 realistic Mumbai-area hospitality assets)
 # ─────────────────────────────────────────────────────────────────────────────

@@ -285,6 +285,8 @@ export interface BookingItem {
   payment_status: string  // "pending" | "paid" | "failed"
   created_at: string
   asset_title: string | null
+  asset_address: string | null
+  asset_image_path: string | null
 }
 
 export interface RazorpayOrder {
@@ -448,6 +450,16 @@ export const contactAPI = {
 
 // ─── Weather Digital Twin (Addendum 10) ───────────────────────────────────────
 
+export interface SignalExcerpt { text?: string; title?: string; url: string }
+export interface CombinedSignal {
+  mastodon_count: number
+  mastodon_excerpts: SignalExcerpt[]
+  gdelt_count: number
+  gdelt_excerpts: SignalExcerpt[]
+  combined_count: number
+  summary_text: string
+}
+
 export interface WeatherTwinListing {
   asset_id: string
   title: string
@@ -456,21 +468,35 @@ export interface WeatherTwinListing {
   lat: number
   lon: number
   weather: { precip_prob: number; wind_kmh: number; temp_c: number }
+  is_simulated: boolean
+  severity_base: number
   severity: number
+  signal_bump_applied: boolean
+  duration_multiplier: number
   demand_impact: number
+  live_demand_impact: number | null
   dominant_factor: 'rain' | 'wind' | 'heat' | 'none'
-  social_signal: string
+  social_signal: CombinedSignal
   reasoning: string | null
 }
 
-export type WeatherScenario = 'normal' | 'heavy_rain' | 'heat_wave'
+export type WeatherScenario = 'normal' | 'custom'
+export type WeatherType = 'rain' | 'heat'
 
 export interface WeatherTwinSnapshot {
   scenario: WeatherScenario
   listings: WeatherTwinListing[]
 }
 
+export interface WeatherTwinParams {
+  scenario: WeatherScenario
+  weather_type?: WeatherType
+  intensity?: number
+  duration_hours?: number
+  location_scope?: string | null
+}
+
 export const weatherTwinAPI = {
-  snapshot: (scenario: WeatherScenario) =>
-    api.get<WeatherTwinSnapshot>('/weather/twin-snapshot', { params: { scenario } }),
+  snapshot: (params: WeatherTwinParams) =>
+    api.get<WeatherTwinSnapshot>('/weather/twin-snapshot', { params }),
 }

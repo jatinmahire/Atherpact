@@ -26,6 +26,7 @@ from services.weather_twin_service import (
     demand_impact,
     resource_type_for_category,
     SCENARIO_PRESETS,
+    weather_for_intensity,
 )
 
 # Fri/Sat carry a real weekend premium common to event/hospitality rentals;
@@ -65,7 +66,8 @@ def weather_multiplier_for(asset, simulation: str | None) -> tuple[float, dict |
     is the active global Simulation Mode preset, if any — never a locally
     invented override."""
     if simulation and simulation in SCENARIO_PRESETS:
-        weather = SCENARIO_PRESETS[simulation]
+        preset = SCENARIO_PRESETS[simulation]
+        weather = weather_for_intensity(preset["weather_type"], preset["intensity"])
     elif asset.lat is not None and asset.lon is not None:
         weather = fetch_live_weather(asset.lat, asset.lon)
     else:

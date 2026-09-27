@@ -7,10 +7,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Loader2, MapPin, LocateFixed, CloudRain, Check } from 'lucide-react'
-import { matchAPI, listingsAPI, weatherTwinAPI } from '../api/client'
-import type { MatchResultItem, Listing, WeatherTwinListing } from '../api/client'
+import { matchAPI, listingsAPI, weatherTwinAPI, bookingsAPI, listingImageUrl } from '../api/client'
+import type { MatchResultItem, Listing, WeatherTwinListing, BookingItem } from '../api/client'
 import { authStore } from '../store/auth'
-import { simulationStore } from '../store/simulation'
+import { simulationStore, modeToTwinParams } from '../store/simulation'
 import { deriveAdvisoryTag } from '../lib/weatherAdvisory'
 import MatchCard from '../components/MatchCard'
 import { SkeletonList } from '../components/SkeletonCard'
@@ -89,6 +89,14 @@ export default function SeekerPortal() {
     return authStore.subscribe(check)
   }, [])
 
+  // My Bookings — real bookings this seeker made, with the provider's real
+  // address and photo, straight from GET /bookings (no fabricated data).
+  const [myBookings, setMyBookings] = useState<BookingItem[]>([])
+  useEffect(() => {
+    if (!user?.id) return
+    bookingsAPI.list().then((res) => setMyBookings(res.data)).catch(() => {})
+  }, [user?.id])
+
   const [query, setQuery]       = useState('')
   const [budget, setBudget]     = useState('')
   const [results, setResults]   = useState<MatchResultItem[]>([])
@@ -148,7 +156,7 @@ export default function SeekerPortal() {
   const [simMode, setSimMode] = useState(simulationStore.getMode())
   useEffect(() => simulationStore.subscribe(() => setSimMode(simulationStore.getMode())), [])
   useEffect(() => {
-    weatherTwinAPI.snapshot(simMode ?? 'normal')
+    weatherTwinAPI.snapshot(modeToTwinParams(simMode))
       .then((res) => setWeatherImpact(new Map(res.data.listings.map((l) => [l.asset_id, l]))))
       .catch(() => {})
   }, [simMode])
@@ -216,6 +224,41 @@ export default function SeekerPortal() {
             Scores are computed live — never hardcoded.
           </p>
         </motion.div>
+
+        {/* My Bookings — real portfolio of what this seeker has booked */}
+        {user && myBookings.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">My Bookings</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {myBookings.map((b) => (
+                <div key={b.id} className="bg-white rounded-2xl shadow-sm border border-lavender/20 overflow-hidden">
+                  {b.asset_image_path ? (
+                    <img src={listingImageUrl(b.asset_image_path)} alt={b.asset_title ?? ''}
+                      className="w-full h-32 object-cover" />
+                  ) : (
+                    <div className="w-full h-32 bg-lavender/10 flex items-center justify-center text-xs text-gray-400">No photo</div>
+                  )}
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-900">{b.asset_title ?? 'Listing'}</h3>
+                    {b.asset_address && (
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                        <MapPin size={12} /> {b.asset_address}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-2">
+                      {new Date(b.starts_at).toLocaleDateString()} – {new Date(b.ends_at).toLocaleDateString()}
+                    </p>
+                    <span className={`inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full ${
+                      b.payment_status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {b.payment_status === 'paid' ? 'Confirmed & Paid' : b.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search form */}
         <form onSubmit={search} className="bg-white rounded-2xl shadow-sm border border-lavender/20 p-5 mb-6">

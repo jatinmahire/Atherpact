@@ -44,6 +44,8 @@ class BookingOut(BaseModel):
     payment_status: str
     created_at: datetime
     asset_title: Optional[str] = None
+    asset_address: Optional[str] = None
+    asset_image_path: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -195,6 +197,8 @@ def list_bookings(
             payment_status=b.payment_status,
             created_at=b.created_at,
             asset_title=asset.title if asset else None,
+            asset_address=asset.address if asset else None,
+            asset_image_path=asset.image_path if asset else None,
         ))
     return result
 

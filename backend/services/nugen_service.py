@@ -130,7 +130,13 @@ class NugenClient:
                 f"{BASE_URL}/api/v3/agents/run-agents/{agent_name}/run",
                 json={"message": message},
                 headers=self._headers(),
-                timeout=45.0,
+                # Nugen's API has been unreachable for this entire session
+                # (immediate 502s, confirmed repeatedly) — verified live just
+                # now that it can also accept a connection and then stall
+                # instead, so a short timeout matters: callers like the
+                # Weather Digital Twin endpoint (Phase 91-96) call this once
+                # per unique city/condition and a judge is waiting on it.
+                timeout=12.0,
             ) as resp:
                 if resp.status_code != 200:
                     logger.warning("Nugen run-agent for %s failed: HTTP %s", agent_name, resp.status_code)

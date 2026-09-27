@@ -10,6 +10,17 @@
 
 export type SimulationMode = 'heavy_rain' | 'heat_wave' | null
 
+// Phase 93: the twin-snapshot endpoint no longer takes these two fixed
+// preset names directly — it takes a continuous (weather_type, intensity)
+// pair instead. These are the exact same numbers the old presets used, so
+// every existing consumer of the global mode (pricing, advisory tags, the
+// banner) sees unchanged behavior.
+export function modeToTwinParams(mode: SimulationMode): { scenario: 'normal' | 'custom'; weather_type?: 'rain' | 'heat'; intensity?: number } {
+  if (mode === 'heavy_rain') return { scenario: 'custom', weather_type: 'rain', intensity: 90 }
+  if (mode === 'heat_wave') return { scenario: 'custom', weather_type: 'heat', intensity: 75 }
+  return { scenario: 'normal' }
+}
+
 let _mode: SimulationMode = null
 const _listeners: Array<() => void> = []
 
